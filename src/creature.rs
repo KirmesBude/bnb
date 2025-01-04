@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::prelude::*;
 
 pub struct CreaturePlugin;
@@ -95,6 +97,12 @@ impl Creature {
         self.remove_condition(ConditionKind::Wound);
         self.remove_condition(ConditionKind::Poison);
     }
+
+    pub fn calculate_attack_damage(&self, attack: &Attack) -> usize {
+        let poison = if self.conditions.poison { 1 } else { 0 };
+
+        (attack.damage + poison).saturating_sub(self.shield.saturating_sub(attack.pierce))
+    }
 }
 
 #[derive(Default, Debug, Reflect)]
@@ -142,4 +150,22 @@ pub enum ConditionKind {
     Immobilize,
     Disarm,
     Muddle,
+}
+
+/* TODO: Maybe those should be components and entities, with a queue of entities  */
+pub struct DamageQueue {
+    queue: VecDeque<DamageKind>,
+}
+
+pub enum DamageKind {
+    Attack(Attack),
+    Suffer(usize),
+}
+
+pub struct Attack {
+    source: Entity,
+    damage: usize,
+    pierce: usize,
+    push: usize,
+    pull: usize,
 }
