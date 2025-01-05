@@ -1,5 +1,6 @@
 mod creature;
 mod demo;
+mod figure;
 mod game;
 mod scenario;
 

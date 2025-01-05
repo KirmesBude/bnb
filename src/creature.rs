@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use bevy::prelude::*;
 
 pub struct CreaturePlugin;
@@ -152,16 +150,7 @@ pub enum ConditionKind {
     Muddle,
 }
 
-/* TODO: Maybe those should be components and entities, with a queue of entities  */
-pub struct DamageQueue {
-    queue: VecDeque<DamageKind>,
-}
-
-pub enum DamageKind {
-    Attack(Attack),
-    Suffer(usize),
-}
-
+/* TODO: This or some other struct may need to contain number of targets or AOE also range */
 pub struct Attack {
     source: Entity,
     damage: usize,
