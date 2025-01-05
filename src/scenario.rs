@@ -1,139 +1,174 @@
 use bevy::{
     ecs::{component::ComponentId, world::DeferredWorld},
     prelude::*,
+    utils::HashMap,
 };
+use hexx::{Hex, HexLayout};
 
 pub struct ScenarioPlugin;
 
 impl Plugin for ScenarioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (map_position_add, change_map_position_update, sync_position_to_transform).chain());
-        app.register_type::<MapPosition>();
+        app.add_systems(
+            Update,
+            (update_hex_position_hashmap, hex_position_to_transform).chain(),
+        )
+        .init_resource::<ActiveMap>();
+
+        app.register_type::<ActiveMap>();
+        app.register_type::<HexGrid>();
+        app.register_type::<HexLayer>();
+        app.register_type::<HexPosition>();
     }
 }
 
-#[derive(Debug, Component)]
-#[require(Transform)]
-pub struct Map {
-    width: usize,
-    height: usize,
-    tiles: Vec<Vec<Entity>>,
+/* This resource is used to retrieve the active map entity for hierarchy reasons of overlay tiles spawning */
+/* Can also be used to despawn the whole map entity */
+#[derive(Debug, Default, Resource, Reflect)]
+#[reflect(Resource)]
+pub struct ActiveMap {
+    entity: Option<Entity>,
 }
 
-impl Map {
-    pub fn new(width: usize, height: usize) -> Self {
+/* This component is inserted on the map entity */
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component)]
+#[require(Transform, Visibility)]
+pub struct HexGrid {
+    layout: HexLayout,
+    /* This can be used to check whether it is a valid hex at all */
+    ground_entities: HashMap<Hex, Entity>,
+    overlay_entities: HashMap<Hex, Entity>,
+    figure_entities: HashMap<Hex, Entity>,
+}
+
+impl HexGrid {
+    pub fn new(layout: HexLayout) -> Self {
         Self {
-            width,
-            height,
-            tiles: vec![Vec::new(); width * height],
+            layout,
+            ground_entities: HashMap::new(),
+            overlay_entities: HashMap::new(),
+            figure_entities: HashMap::new(),
         }
     }
 
-    pub fn update(&mut self, entity: Entity, position: &MapPosition) {
-        /* remove entity from last position */
-        self.remove(entity, position.last_x, position.last_y);
+    pub fn remove(&mut self, hex: &Hex, layer: &HexLayer) {
+        let map = self.get_layer_map_mut(layer);
 
-        /* add entity to new position */
-        self.add(entity, position.x, position.y);
+        map.remove(hex);
     }
 
-    pub fn add(&mut self, entity: Entity, x: usize, y: usize) {
-        let vec = &mut self.tiles[y * self.width + x];
-        vec.push(entity);
+    pub fn insert(&mut self, hex: Hex, layer: &HexLayer, entity: Entity) {
+        let map = self.get_layer_map_mut(layer);
+
+        map.insert(hex, entity);
     }
 
-    pub fn remove(&mut self, entity: Entity, x: usize, y: usize) {
-        let vec = &mut self.tiles[y * self.width + x];
-        if let Some(pos) = vec.iter().position(|e| *e == entity) {
-            vec.remove(pos);
+    fn get_layer_map(&self, layer: &HexLayer) -> &HashMap<Hex, Entity> {
+        match layer {
+            HexLayer::Ground => &self.ground_entities,
+            HexLayer::Overlay => &self.overlay_entities,
+            HexLayer::Figure => &self.figure_entities,
+        }
+    }
+
+    fn get_layer_map_mut(&mut self, layer: &HexLayer) -> &mut HashMap<Hex, Entity> {
+        match layer {
+            HexLayer::Ground => &mut self.ground_entities,
+            HexLayer::Overlay => &mut self.overlay_entities,
+            HexLayer::Figure => &mut self.figure_entities,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Reflect)]
+pub enum HexLayer {
+    Ground,
+    Overlay,
+    Figure,
+}
+
+impl HexLayer {
+    pub fn z(&self) -> f32 {
+        match self {
+            HexLayer::Ground => 0.0,
+            HexLayer::Overlay => 1.0,
+            HexLayer::Figure => 2.0,
+        }
+    }
+
+    pub fn scale(&self) -> Vec3 {
+        match self {
+            HexLayer::Ground => Vec3::splat(0.98),
+            HexLayer::Overlay => Vec3::splat(0.95),
+            HexLayer::Figure => Vec3::splat(0.9),
         }
     }
 }
 
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_remove = MapPosition::on_remove)]
-pub struct MapPosition {
-    map: Entity,
-    x: usize,
-    y: usize,
-    last_x: usize,
-    last_y: usize,
+#[component(on_remove = hex_position_on_remove)]
+#[require(Transform)]
+pub struct HexPosition {
+    hex: Hex,
+    previous_hex: Option<Hex>,
+    layer: HexLayer,
 }
 
-impl MapPosition {
-    pub fn new(map: Entity, x: usize, y: usize) -> Self {
+impl HexPosition {
+    pub fn new(hex: Hex, layer: HexLayer) -> Self {
         Self {
-            map,
-            x,
-            y,
-            last_x: 0,
-            last_y: 0,
+            hex,
+            layer,
+            previous_hex: None,
         }
     }
 
-    pub fn update(&mut self, x: usize, y: usize) {
-        self.last_x = self.x;
-        self.last_y = self.y;
-        self.x = x;
-        self.y = y;
-    }
-
-    pub fn map(&self) -> Entity {
-        self.map
-    }
-
-    pub fn x(&self) -> usize {
-        self.x
-    }
-
-    pub fn y(&self) -> usize {
-        self.y
-    }
-
-    pub fn on_remove(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
-        let (x, y) = {
-            let component = world.get::<Self>(entity).unwrap();
-            (component.x, component.y)
-        };
-        let mut map = world.get_mut::<Map>(entity).unwrap();
-
-        map.remove(entity, x, y);
+    pub fn update(&mut self, hex: Hex) {
+        self.previous_hex = Some(self.hex);
+        self.hex = hex;
     }
 }
 
-pub fn map_position_add(
-    mut maps: Query<&mut Map>,
-    map_positions: Query<(Entity, &MapPosition), Added<MapPosition>>,
+fn hex_position_on_remove(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
+    let (hex, layer, parent) = {
+        let hex_position = world.get::<HexPosition>(entity).unwrap();
+        let parent = world.get::<Parent>(entity).unwrap();
+
+        (hex_position.hex, hex_position.layer, parent)
+    };
+    let mut hex_grid = world.get_mut::<HexGrid>(parent.get()).unwrap();
+
+    hex_grid.remove(&hex, &layer);
+}
+
+/* TODO: Easing */
+fn hex_position_to_transform(
+    hex_grids: Query<&HexGrid>,
+    mut hex_positions: Query<(&HexPosition, &mut Transform, &Parent), Changed<HexPosition>>,
 ) {
-    for (entity, map_position) in &map_positions {
-        if let Ok(mut map) = maps.get_mut(map_position.map) {
-            map.add(entity, map_position.x, map_position.y);
+    for (hex_position, mut transform, parent) in &mut hex_positions {
+        if let Ok(hex_grid) = hex_grids.get(parent.get()) {
+            let pos = hex_grid.layout.hex_to_world_pos(hex_position.hex);
+            let z = hex_position.layer.z();
+            let scale = hex_position.layer.scale();
+
+            *transform = Transform::from_xyz(pos.x, pos.y, z).with_scale(scale);
         }
     }
 }
 
-pub fn change_map_position_update(
-    mut maps: Query<&mut Map>,
-    map_positions: Query<(Entity, &MapPosition), Changed<MapPosition>>,
+fn update_hex_position_hashmap(
+    mut hex_grids: Query<&mut HexGrid>,
+    hex_positions: Query<(Entity, &HexPosition, &Parent), Changed<HexPosition>>,
 ) {
-    for (entity, map_position) in &map_positions {
-        if let Ok(mut map) = maps.get_mut(map_position.map) {
-            map.update(entity, map_position);
-        }
-    }
-}
-
-/* TODO: Should use hierarchy */
-fn sync_position_to_transform(
-    maps: Query<(&GlobalTransform, &Map)>,
-    mut map_positions: Query<(&mut Transform, &MapPosition)>
-) {
-    for (mut transform, map_position) in &mut map_positions {
-        if let Ok((map_transform, map)) = maps.get(map_position.map) {
-            /* TODO: Does not support map rotation */
-            let tile_size = 50.0;
-            transform.translation = map_transform.translation() + Vec3::new(((map_position.x as f32)-((map.width as f32)/2.0)) * tile_size, ((map_position.y as f32)-((map.height as f32)/2.0)) * tile_size, 0.0);
+    for (entity, hex_position, parent) in &hex_positions {
+        if let Ok(mut hex_grid) = hex_grids.get_mut(parent.get()) {
+            if let Some(previous_hex) = hex_position.previous_hex {
+                hex_grid.remove(&previous_hex, &hex_position.layer);
+            }
+            hex_grid.insert(hex_position.hex, &hex_position.layer, entity);
         }
     }
 }

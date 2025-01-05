@@ -1459,6 +1459,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
+ "hexx",
 ]
 
 [[package]]
@@ -2503,6 +2504,17 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
+
+[[package]]
+name = "hexx"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b450e02a24a4a981c895be4cd2752e2401996c545971309730c4e812b984691"
+dependencies = [
+ "bevy_reflect",
+ "glam",
+ "serde",
+]
 
 [[package]]
 name = "image"
