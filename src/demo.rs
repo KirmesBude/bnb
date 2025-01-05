@@ -1,6 +1,6 @@
 use bevy::{
     asset::RenderAssetUsages,
-    color::palettes::css::WHITE,
+    color::palettes::css::{AQUA, WHITE},
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
 };
@@ -32,14 +32,19 @@ fn setup(
     };
     let mesh = meshes.add(hexagonal_plane(&layout));
 
+    let aqua_material = materials.add(Color::from(AQUA));
+    let white_material = materials.add(Color::from(WHITE));
+
     let entities: Vec<Entity> = shapes::flat_rectangle([-2, 2, -3, 2])
         .map(|hex| {
             let entity = commands
                 .spawn((
                     Mesh2d(mesh.clone()),
-                    MeshMaterial2d(materials.add(Color::from(WHITE))),
+                    MeshMaterial2d(white_material.clone()),
                     HexPosition::new(hex, HexLayer::Ground),
                 ))
+                .observe(update_material_on::<Pointer<Over>>(aqua_material.clone()))
+                .observe(update_material_on::<Pointer<Out>>(white_material.clone()))
                 .with_children(|b| {
                     b.spawn((
                         Text2d(format!("{},{}", hex.x, hex.y)),
@@ -62,15 +67,28 @@ fn setup(
 fn hexagonal_plane(hex_layout: &HexLayout) -> Mesh {
     let mesh_info = PlaneMeshBuilder::new(hex_layout)
         .facing(Vec3::Z)
-        .with_scale(Vec3::splat(0.9))
+        .with_scale(Vec3::splat(1.0))
         .center_aligned()
         .build();
     Mesh::new(
         PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
+        RenderAssetUsages::default(),
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, mesh_info.vertices)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, mesh_info.normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, mesh_info.uvs)
     .with_inserted_indices(Indices::U16(mesh_info.indices))
+}
+
+fn update_material_on<E>(
+    new_material: Handle<ColorMaterial>,
+) -> impl Fn(Trigger<E>, Query<&mut MeshMaterial2d<ColorMaterial>>) {
+    // An observer closure that captures `new_material`. We do this to avoid needing to write four
+    // versions of this observer, each triggered by a different event and with a different hardcoded
+    // material. Instead, the event type is a generic, and the material is passed in.
+    move |trigger, mut query| {
+        if let Ok(mut material) = query.get_mut(trigger.entity()) {
+            material.0 = new_material.clone();
+        }
+    }
 }

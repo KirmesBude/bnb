@@ -21,6 +21,7 @@ impl Plugin for GamePlugin {
         app.add_plugins(StateInspectorPlugin::<AppState>::default());
         app.add_plugins(StateInspectorPlugin::<ScenarioState>::default());
         app.add_plugins(StateInspectorPlugin::<RoundState>::default());
+        app.add_plugins(MeshPickingPlugin);
     }
 }
 
