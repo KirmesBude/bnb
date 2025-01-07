@@ -1,4 +1,3 @@
-mod creature;
 mod demo;
 mod figure;
 mod game;
@@ -6,7 +5,6 @@ mod scenario;
 
 use bevy::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use creature::CreaturePlugin;
 use demo::DemoPlugin;
 use figure::FigurePlugin;
 use game::GamePlugin;
@@ -18,7 +16,6 @@ fn main() {
             DefaultPlugins,
             GamePlugin,
             ScenarioPlugin,
-            CreaturePlugin,
             DemoPlugin,
             CommandPlugin,
             FigurePlugin,

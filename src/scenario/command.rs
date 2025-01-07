@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 use hexx::Hex;
 
-use crate::figure::health::Health;
-use dyn_clone::DynClone;
 use super::HexPosition;
+use crate::{figure::health::Health, scenario::command};
 
 /* Everything that happens in the scenario needs to be recorded (and maybe this is the source of truth?) */
 /* Every "action" needs to be reversible */
@@ -18,21 +17,18 @@ pub struct CommandPlugin;
 impl Plugin for CommandPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CommandQueue>();
+        app.register_type::<Command>()
+            .register_type::<MovementKind>()
+            .register_type::<CommandQueue>();
 
         app.add_systems(Update, step_commands);
     }
 }
 
-/* TODO: Could be non_send_resource */
-pub trait Command: Sync + Send + DynClone {
-    fn execute(&mut self, world: &mut World) -> Vec<Box<dyn Command>>;
-
-    fn undo(&self, world: &mut World);
-}
-
-#[derive(Default, Resource)]
+#[derive(Default, Resource, Reflect)]
+#[reflect(Resource)]
 pub struct CommandQueue {
-    queue: Vec<Box<dyn Command>>,
+    queue: Vec<Command>,
     cursor: usize,
 }
 
@@ -48,28 +44,46 @@ impl CommandQueue {
         }
     }
 
-    pub fn queue(&mut self, command: Box<dyn Command>) {
+    pub fn queue(&mut self, commands: Vec<Command>) {
         if self.queue.is_empty() {
-            self.queue.push(command);
+            self.queue = commands;
         } else {
-            self.queue.insert(self.cursor + 1, command);
-        }
-    }
-
-    pub fn execute(&mut self, world: &mut World) {
-        if let Some(command) = self.queue.get_mut(self.cursor) {
-            let commands = command.execute(world);
-
             self.queue
                 .splice(self.cursor + 1..self.cursor + 1, commands);
-            self.cursor += 1;
-
-            println!("{} {}", self.queue.len(), self.cursor);
         }
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Reflect)]
+pub enum Command {
+    MoveCommand(MoveCommand),
+    AttackCommand(AttackCommand),
+    SufferDamageCommand(SufferDamageCommand),
+}
+
+impl Command {
+    fn execute(&mut self, world: &mut World) -> Vec<Command> {
+        match self {
+            Command::MoveCommand(move_command) => move_command.execute(world),
+            Command::AttackCommand(attack_command) => attack_command.execute(world),
+            Command::SufferDamageCommand(suffer_damage_command) => {
+                suffer_damage_command.execute(world)
+            }
+        }
+    }
+
+    fn undo(&self, world: &mut World) {
+        match self {
+            Command::MoveCommand(move_command) => move_command.undo(world),
+            Command::AttackCommand(attack_command) => attack_command.undo(world),
+            Command::SufferDamageCommand(suffer_damage_command) => {
+                suffer_damage_command.undo(world)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, Reflect)]
 pub enum MovementKind {
     #[default]
     Default,
@@ -77,7 +91,7 @@ pub enum MovementKind {
     Fly,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct MoveCommand {
     entity: Entity,
     start: Option<Hex>,
@@ -99,10 +113,8 @@ impl MoveCommand {
         self.kind = kind;
         self
     }
-}
 
-impl Command for MoveCommand {
-    fn execute(&mut self, world: &mut World) -> Vec<Box<dyn Command>> {
+    fn execute(&mut self, world: &mut World) -> Vec<Command> {
         let mut entity_world_mut = world.entity_mut(self.entity);
         let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
         self.start = Some(hex_position.hex());
@@ -122,7 +134,7 @@ impl Command for MoveCommand {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct AttackCommand {
     source: Entity,
     target: Entity,
@@ -132,13 +144,11 @@ impl AttackCommand {
     pub fn new(source: Entity, target: Entity) -> Self {
         Self { source, target }
     }
-}
 
-impl Command for AttackCommand {
-    fn execute(&mut self, world: &mut World) -> Vec<Box<dyn Command>> {
+    fn execute(&mut self, world: &mut World) -> Vec<Command> {
         /* TODO: Store pending attack on one of the entities and add additional commands for modifier deck, etc. */
 
-        vec![Box::new(SufferDamageCommand::new(
+        vec![Command::SufferDamageCommand(SufferDamageCommand::new(
             self.source,
             self.target,
             2,
@@ -150,7 +160,7 @@ impl Command for AttackCommand {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct SufferDamageCommand {
     source: Entity,
     target: Entity,
@@ -167,10 +177,8 @@ impl SufferDamageCommand {
             actual_damage: Default::default(),
         }
     }
-}
 
-impl Command for SufferDamageCommand {
-    fn execute(&mut self, world: &mut World) -> Vec<Box<dyn Command>> {
+    fn execute(&mut self, world: &mut World) -> Vec<Command> {
         let mut target = world.entity_mut(self.target);
         let mut health = target.get_mut::<Health>().unwrap();
         self.actual_damage = Some(health.suffer(self.damage));
@@ -194,13 +202,24 @@ fn step_commands(world: &mut World) {
         println!("Enter");
 
         let command_queue = world.get_resource::<CommandQueue>().unwrap();
-        let mut command = dyn_clone::clone_box(&*command_queue.queue[command_queue.cursor]);
-        let commands = command.execute(world);
+        let cursor = command_queue.cursor;
+        if let Some(mut command) = command_queue.queue.get(cursor).cloned() {
+            let commands = command.execute(world);
+
+            let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
+            command_queue.queue[cursor] = command;
+            command_queue.queue(commands);
+
+            command_queue.cursor += 1;
+        }
+    } else if keyboard_input.just_pressed(KeyCode::Backspace) {
+        println!("Backspace");
 
         let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
-        let cursor = command_queue.cursor;
-        command_queue.queue
-        .splice(cursor + 1..cursor + 1, commands);
-        command_queue.cursor += 1;
+        command_queue.cursor = command_queue.cursor.saturating_sub(1);
+
+        if let Some(command) = command_queue.queue.pop() {
+            command.undo(world);
+        }
     }
 }

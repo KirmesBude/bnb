@@ -7,4 +7,3 @@ edition = "2021"
 bevy = "0.15"
 bevy-inspector-egui = "0.28"
 hexx = {version = "0.19", features = ["bevy_reflect"] }
-dyn-clone = "1.0.17"
