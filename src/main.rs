@@ -8,8 +8,9 @@ use bevy::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use creature::CreaturePlugin;
 use demo::DemoPlugin;
+use figure::FigurePlugin;
 use game::GamePlugin;
-use scenario::ScenarioPlugin;
+use scenario::{command::CommandPlugin, ScenarioPlugin};
 
 fn main() {
     App::new()
@@ -19,6 +20,8 @@ fn main() {
             ScenarioPlugin,
             CreaturePlugin,
             DemoPlugin,
+            CommandPlugin,
+            FigurePlugin,
         ))
         .add_plugins(WorldInspectorPlugin::new())
         .run();

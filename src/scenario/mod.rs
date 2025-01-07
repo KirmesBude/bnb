@@ -5,6 +5,7 @@ use bevy::{
 };
 use hexx::{Hex, HexLayout};
 
+pub mod command;
 pub struct ScenarioPlugin;
 
 impl Plugin for ScenarioPlugin {
@@ -112,7 +113,7 @@ impl HexLayer {
 #[require(Transform)]
 pub struct HexPosition {
     hex: Hex,
-    previous_hex: Option<Hex>,
+    previous_hex: Option<Hex>, /* TODO: Might not be needed if encoded in CommandQueue */
     layer: HexLayer,
 }
 
@@ -128,6 +129,10 @@ impl HexPosition {
     pub fn update(&mut self, hex: Hex) {
         self.previous_hex = Some(self.hex);
         self.hex = hex;
+    }
+
+    pub fn hex(&self) -> Hex {
+        self.hex
     }
 }
 

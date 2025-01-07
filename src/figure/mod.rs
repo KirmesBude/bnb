@@ -1,5 +1,5 @@
-mod condition;
-mod health;
+pub mod condition;
+pub mod health;
 
 /* What does a Figure need? */
 /* Initiative or is that different? Active Ability? */
@@ -9,6 +9,19 @@ mod health;
 /* AttackEffects: Vec of AttackEffects that are added to any attack this figure does */
 
 use bevy::prelude::*;
+use condition::{ConditionKind, Conditions};
+use health::Health;
+
+pub struct FigurePlugin;
+
+impl Plugin for FigurePlugin {
+    fn build(&self, app: &mut App) {
+        app.register_type::<Team>()
+            .register_type::<Health>()
+            .register_type::<Conditions>()
+            .register_type::<ConditionKind>();
+    }
+}
 
 /* TODO: Or should those be marker component to query for? */
 #[derive(Debug, Component, Reflect)]

@@ -13,7 +13,7 @@ pub enum ConditionKind {
 }
 
 /* You want conditions and immunities on the same struct */
-#[derive(Debug, Reflect)]
+#[derive(Debug, Component, Reflect)]
 pub struct Conditions {
     conditions: HashSet<ConditionKind>,
     /* Immunities are immutable and can only be specified at creation */
@@ -24,7 +24,7 @@ impl Conditions {
     pub fn new(immunities: &[ConditionKind]) -> Self {
         Self {
             conditions: HashSet::new(),
-            immunities: immunities.to_owned().into_iter().collect(),
+            immunities: immunities.iter().copied().collect(),
         }
     }
 
