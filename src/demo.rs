@@ -1,12 +1,13 @@
 use bevy::{
     asset::RenderAssetUsages,
-    color::palettes::css::{AQUA, WHITE},
+    color::palettes::css::{AQUA, GREEN, RED, WHITE},
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
 };
-use hexx::{shapes, HexLayout, HexOrientation, PlaneMeshBuilder};
+use bevy_inspector_egui::egui::collapsing_header::HeaderResponse;
+use hexx::{shapes, Hex, HexLayout, HexOrientation, PlaneMeshBuilder};
 
-use crate::scenario::{HexGrid, HexLayer, HexPosition};
+use crate::{creature::Health, scenario::{command::{AttackCommand, CommandQueue, MoveCommand}, HexGrid, HexLayer, HexPosition}};
 
 pub struct DemoPlugin;
 
@@ -22,6 +23,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut command_queue: ResMut<CommandQueue>,
 ) {
     commands.spawn(Camera2d);
 
@@ -34,6 +36,8 @@ fn setup(
 
     let aqua_material = materials.add(Color::from(AQUA));
     let white_material = materials.add(Color::from(WHITE));
+    let red_material = materials.add(Color::from(RED));
+    let green_material = materials.add(Color::from(GREEN));
 
     let entities: Vec<Entity> = shapes::flat_rectangle([-2, 2, -3, 2])
         .map(|hex| {
@@ -61,7 +65,25 @@ fn setup(
         })
         .collect();
 
-    commands.spawn(HexGrid::new(layout)).add_children(&entities);
+    let figure_a = commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(green_material.clone()),
+        HexPosition::new(Hex::new(0, 0), HexLayer::Figure),
+        Health::new(12),
+    )).id();
+
+    let figure_b = commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(red_material.clone()),
+        HexPosition::new(Hex::new(2, 1), HexLayer::Figure),
+        Health::new(12),
+    )).id();
+
+    commands.spawn(HexGrid::new(layout)).add_children(&entities).add_children(&[figure_a, figure_b]);
+
+    command_queue.queue(Box::new(MoveCommand::new(figure_a, Hex::new(1, 0))));
+    command_queue.queue(Box::new(MoveCommand::new(figure_a, Hex::new(1, 1))));
+    command_queue.queue(Box::new(AttackCommand::new(figure_a, figure_b)));
 }
 
 fn hexagonal_plane(hex_layout: &HexLayout) -> Mesh {

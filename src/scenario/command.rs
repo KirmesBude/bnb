@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use hexx::Hex;
 
 use crate::figure::health::Health;
-
+use dyn_clone::DynClone;
 use super::HexPosition;
 
 /* Everything that happens in the scenario needs to be recorded (and maybe this is the source of truth?) */
@@ -23,7 +23,8 @@ impl Plugin for CommandPlugin {
     }
 }
 
-pub trait Command: Sync + Send {
+/* TODO: Could be non_send_resource */
+pub trait Command: Sync + Send + DynClone {
     fn execute(&mut self, world: &mut World) -> Vec<Box<dyn Command>>;
 
     fn undo(&self, world: &mut World);
@@ -48,7 +49,11 @@ impl CommandQueue {
     }
 
     pub fn queue(&mut self, command: Box<dyn Command>) {
-        self.queue.insert(self.cursor + 1, command);
+        if self.queue.is_empty() {
+            self.queue.push(command);
+        } else {
+            self.queue.insert(self.cursor + 1, command);
+        }
     }
 
     pub fn execute(&mut self, world: &mut World) {
@@ -58,11 +63,13 @@ impl CommandQueue {
             self.queue
                 .splice(self.cursor + 1..self.cursor + 1, commands);
             self.cursor += 1;
+
+            println!("{} {}", self.queue.len(), self.cursor);
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum MovementKind {
     #[default]
     Default,
@@ -70,7 +77,7 @@ pub enum MovementKind {
     Fly,
 }
 
-/* Consider  */
+#[derive(Clone)]
 pub struct MoveCommand {
     entity: Entity,
     start: Option<Hex>,
@@ -101,6 +108,8 @@ impl Command for MoveCommand {
         self.start = Some(hex_position.hex());
         hex_position.update(self.end);
 
+        println!("Move {} to {:?}", self.entity, self.end);
+
         /* Reactivity how? Via an event that is consumed and someone adds to the queue? */
         vec![]
     }
@@ -113,6 +122,7 @@ impl Command for MoveCommand {
     }
 }
 
+#[derive(Clone)]
 pub struct AttackCommand {
     source: Entity,
     target: Entity,
@@ -140,6 +150,7 @@ impl Command for AttackCommand {
     }
 }
 
+#[derive(Clone)]
 pub struct SufferDamageCommand {
     source: Entity,
     target: Entity,
@@ -177,14 +188,19 @@ impl Command for SufferDamageCommand {
 }
 
 fn step_commands(world: &mut World) {
-    let keyboard_input = world.get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+    let keyboard_input = world.get_resource::<ButtonInput<KeyCode>>().unwrap();
 
     if keyboard_input.just_pressed(KeyCode::Enter) {
         println!("Enter");
-        let world = world.as_unsafe_world_cell();
-        unsafe {
-            let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
-            command_queue.execute(world.world_mut());
-        }
+
+        let command_queue = world.get_resource::<CommandQueue>().unwrap();
+        let mut command = dyn_clone::clone_box(&*command_queue.queue[command_queue.cursor]);
+        let commands = command.execute(world);
+
+        let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
+        let cursor = command_queue.cursor;
+        command_queue.queue
+        .splice(cursor + 1..cursor + 1, commands);
+        command_queue.cursor += 1;
     }
 }
