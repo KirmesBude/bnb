@@ -8,9 +8,11 @@ pub mod health;
 /* CalculatedRetaliate: Base [+] any bonuses as Retaliate(usize, usize) */
 /* AttackEffects: Vec of AttackEffects that are added to any attack this figure does */
 
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use condition::{ConditionKind, Conditions};
 use health::Health;
+
+use crate::scenario::HexPosition;
 
 pub struct FigurePlugin;
 
@@ -21,6 +23,15 @@ impl Plugin for FigurePlugin {
             .register_type::<Conditions>()
             .register_type::<ConditionKind>();
     }
+}
+
+#[derive(Debug, Bundle)]
+pub struct FigureBundle {
+    pub mesh_2d: Mesh2d,
+    pub mesh_material_2d: MeshMaterial2d<ColorMaterial>,
+    pub hex_position: HexPosition,
+    pub health: Health,
+    pub conditions: Conditions,
 }
 
 /* TODO: Or should those be marker component to query for? */
@@ -35,4 +46,21 @@ pub enum Team {
 #[derive(Debug, Component, Reflect)]
 pub struct ActiveBonuses {
     bonuses: Vec<Entity>,
+}
+
+/* This is an identifier for each type of figure. */
+/* e.g. Craigheart might be 0 and Skeleton might be 1 */
+/* TODO: Summons should have the same id as the owner */
+#[derive(Debug, Component, PartialEq, Eq, Hash, Reflect)]
+pub struct FigureId(u32);
+
+impl FigureId {
+    pub fn _new(id: u32) -> Self {
+        Self(id)
+    }
+}
+
+#[derive(Debug, Default, Resource, Reflect)]
+pub struct Initiatives {
+    initiatives: HashMap<FigureId, u8>,
 }

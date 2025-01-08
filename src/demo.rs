@@ -1,4 +1,11 @@
-use crate::{figure::health::Health, scenario::command::Command};
+use crate::{
+    figure::{
+        condition::{ConditionKind, Conditions},
+        health::Health,
+        FigureBundle,
+    },
+    scenario::command::{AddConditionCommand, RemoveConditionCommand},
+};
 use bevy::{
     asset::RenderAssetUsages,
     color::palettes::css::{AQUA, GREEN, RED, WHITE},
@@ -8,7 +15,7 @@ use bevy::{
 use hexx::{shapes, Hex, HexLayout, HexOrientation, PlaneMeshBuilder};
 
 use crate::scenario::{
-    command::{AttackCommand, CommandQueue, MoveCommand},
+    command::{AttackCommand, MoveCommand, ScenarioCommandQueue},
     HexGrid, HexLayer, HexPosition,
 };
 
@@ -26,7 +33,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut command_queue: ResMut<CommandQueue>,
+    mut command_queue: ResMut<ScenarioCommandQueue>,
 ) {
     commands.spawn(Camera2d);
 
@@ -69,21 +76,23 @@ fn setup(
         .collect();
 
     let figure_a = commands
-        .spawn((
-            Mesh2d(mesh.clone()),
-            MeshMaterial2d(green_material.clone()),
-            HexPosition::new(Hex::new(0, 0), HexLayer::Figure),
-            Health::new(12),
-        ))
+        .spawn(FigureBundle {
+            mesh_2d: Mesh2d(mesh.clone()),
+            mesh_material_2d: MeshMaterial2d(green_material.clone()),
+            hex_position: HexPosition::new(Hex::new(0, 0), HexLayer::Figure),
+            health: Health::new(12),
+            conditions: Conditions::new(&[]),
+        })
         .id();
 
     let figure_b = commands
-        .spawn((
-            Mesh2d(mesh.clone()),
-            MeshMaterial2d(red_material.clone()),
-            HexPosition::new(Hex::new(2, 1), HexLayer::Figure),
-            Health::new(12),
-        ))
+        .spawn(FigureBundle {
+            mesh_2d: Mesh2d(mesh.clone()),
+            mesh_material_2d: MeshMaterial2d(red_material.clone()),
+            hex_position: HexPosition::new(Hex::new(2, 1), HexLayer::Figure),
+            health: Health::new(12),
+            conditions: Conditions::new(&[ConditionKind::Muddle]),
+        })
         .id();
 
     commands
@@ -92,9 +101,13 @@ fn setup(
         .add_children(&[figure_a, figure_b]);
 
     let new_commands = vec![
-        Command::MoveCommand(MoveCommand::new(figure_a, Hex::new(1, 0))),
-        Command::MoveCommand(MoveCommand::new(figure_a, Hex::new(1, 1))),
-        Command::AttackCommand(AttackCommand::new(figure_a, figure_b)),
+        MoveCommand::new(figure_a, Hex::new(1, 0)).into(),
+        MoveCommand::new(figure_a, Hex::new(1, 1)).into(),
+        AttackCommand::new(figure_a, figure_b).into(),
+        AddConditionCommand::new(figure_b, ConditionKind::Muddle).into(),
+        AddConditionCommand::new(figure_b, ConditionKind::Wound).into(),
+        RemoveConditionCommand::new(figure_b, ConditionKind::Muddle).into(),
+        RemoveConditionCommand::new(figure_b, ConditionKind::Wound).into(),
     ];
     command_queue.queue(new_commands);
 }

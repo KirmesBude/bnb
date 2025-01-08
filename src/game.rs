@@ -206,3 +206,15 @@ fn end_of_round_transition(
         next_state.set(RoundState::StartOfRoundEffects);
     }
 }
+
+/* This is fired whenever an entity should take its turn */
+#[derive(Debug, Event, Reflect)]
+pub struct StartOfTurn {
+    pub entity: Entity,
+}
+
+/* This is fired whenever an entity ends its turn */
+#[derive(Debug, Event, Reflect)]
+pub struct EndOfTurn {
+    pub entity: Entity,
+}

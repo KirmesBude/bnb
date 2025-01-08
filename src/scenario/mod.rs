@@ -65,7 +65,7 @@ impl HexGrid {
         map.insert(hex, entity);
     }
 
-    fn get_layer_map(&self, layer: &HexLayer) -> &HashMap<Hex, Entity> {
+    fn _get_layer_map(&self, layer: &HexLayer) -> &HashMap<Hex, Entity> {
         match layer {
             HexLayer::Ground => &self.ground_entities,
             HexLayer::Overlay => &self.overlay_entities,

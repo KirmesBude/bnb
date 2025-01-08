@@ -30,3 +30,9 @@ impl Health {
         actual_heal
     }
 }
+
+/* This is fired whenever an entity is healed */
+#[derive(Debug, Event, Reflect)]
+pub struct Healed {
+    pub entity: Entity,
+}
