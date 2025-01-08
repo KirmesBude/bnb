@@ -38,9 +38,18 @@ impl CommandQueue {
             /* Any commands after the current one dont matter */
             self.queue.truncate(self.cursor + 1);
             /* Reduce cursor */
-            self.cursor -= 1;
+            self.cursor = self.cursor.saturating_sub(1);
             /* Pop the last one and undo */
             self.queue.pop().unwrap().undo(world);
+        }
+    }
+
+    pub fn execute(&mut self, world: &mut World) {
+        if let Some(command) = self.queue.get_mut(self.cursor) {
+            let commands = command.execute(world);
+
+            self.queue(commands);
+            self.cursor += 1;
         }
     }
 
@@ -196,30 +205,20 @@ impl SufferDamageCommand {
 }
 
 fn step_commands(world: &mut World) {
-    let keyboard_input = world.get_resource::<ButtonInput<KeyCode>>().unwrap();
-
-    if keyboard_input.just_pressed(KeyCode::Enter) {
-        println!("Enter");
-
-        let command_queue = world.get_resource::<CommandQueue>().unwrap();
-        let cursor = command_queue.cursor;
-        if let Some(mut command) = command_queue.queue.get(cursor).cloned() {
-            let commands = command.execute(world);
-
-            let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
-            command_queue.queue[cursor] = command;
-            command_queue.queue(commands);
-
-            command_queue.cursor += 1;
-        }
-    } else if keyboard_input.just_pressed(KeyCode::Backspace) {
-        println!("Backspace");
-
+    /* SAFETY: Need to ensure disjoint queries, more importantly commands are not allowed to modify ButtonInput<KeyCode> or CommandQueue through World */
+    unsafe {
+        let world = world.as_unsafe_world_cell();
+        let keyboard_input = world.get_resource::<ButtonInput<KeyCode>>().unwrap();
         let mut command_queue = world.get_resource_mut::<CommandQueue>().unwrap();
-        command_queue.cursor = command_queue.cursor.saturating_sub(1);
 
-        if let Some(command) = command_queue.queue.pop() {
-            command.undo(world);
+        if keyboard_input.just_pressed(KeyCode::Enter) {
+            println!("Enter");
+
+            command_queue.execute(world.world_mut());
+        } else if keyboard_input.just_pressed(KeyCode::Backspace) {
+            println!("Backspace");
+
+            command_queue.undo(world.world_mut());
         }
     }
 }
