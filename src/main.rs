@@ -1,8 +1,10 @@
+mod action;
 mod demo;
 mod figure;
 mod game;
 mod scenario;
 
+use action::ActionPlugin;
 use bevy::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use demo::DemoPlugin;
@@ -19,6 +21,7 @@ fn main() {
             DemoPlugin,
             CommandPlugin,
             FigurePlugin,
+            ActionPlugin,
         ))
         .add_plugins(WorldInspectorPlugin::new())
         .run();
