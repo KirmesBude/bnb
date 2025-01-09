@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::prelude::*;
 use hexx::Hex;
 
@@ -35,38 +37,30 @@ impl Plugin for CommandPlugin {
 #[derive(Default, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct ScenarioCommandQueue {
-    queue: Vec<ScenarioCommand>,
-    cursor: usize,
+    history: Vec<ScenarioCommand>,
+    pending: VecDeque<ScenarioCommand>,
 }
 
 impl ScenarioCommandQueue {
     pub fn undo(&mut self, world: &mut World) {
-        if !self.queue.is_empty() {
-            /* Any commands after the current one dont matter */
-            self.queue.truncate(self.cursor + 1);
-            /* Reduce cursor */
-            self.cursor = self.cursor.saturating_sub(1);
-            /* Pop the last one and undo */
-            self.queue.pop().unwrap().undo(world);
+        if let Some(command) = self.history.pop() {
+            command.undo(world);
+            self.pending.clear();
         }
     }
 
     pub fn execute(&mut self, world: &mut World) {
-        if let Some(command) = self.queue.get_mut(self.cursor) {
-            let commands = command.execute(world);
+        if let Some(mut command) = self.pending.pop_front() {
+            let mut commands: VecDeque<ScenarioCommand> = command.execute(world).into();
+            self.history.push(command);
 
-            self.queue(commands);
-            self.cursor += 1;
+            commands.append(&mut self.pending);
+            self.pending = commands;
         }
     }
 
     pub fn queue(&mut self, commands: Vec<ScenarioCommand>) {
-        if self.queue.is_empty() {
-            self.queue = commands;
-        } else {
-            self.queue
-                .splice(self.cursor + 1..self.cursor + 1, commands);
-        }
+        self.pending.extend(commands);
     }
 }
 
