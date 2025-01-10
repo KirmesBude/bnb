@@ -7,3 +7,4 @@ edition = "2021"
 bevy = "0.15"
 bevy-inspector-egui = "0.28"
 hexx = {version = "0.19", features = ["bevy_reflect"] }
+enum_dispatch = "0.3.13"

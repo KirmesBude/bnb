@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use bevy::prelude::*;
+use enum_dispatch::enum_dispatch;
 use hexx::Hex;
 
 use super::HexPosition;
@@ -54,7 +55,7 @@ impl ScenarioCommandQueue {
     pub fn execute(&mut self, world: &mut World) {
         if let Some(mut command) = self.pending.pop_front() {
             match command.execute(world) {
-                ScenarionCommandExecuteResult::Pending => return,
+                ScenarionCommandExecuteResult::Pending => (),
                 ScenarionCommandExecuteResult::Done(commands) => {
                     let mut commands: VecDeque<_> = commands.into();
                     self.history.push(command);
@@ -90,44 +91,27 @@ fn step_commands(world: &mut World) {
     }
 }
 
-/* TODO: Have a trait for execute/undo */
-
-#[derive(Debug, Clone, Reflect)]
-pub enum ScenarioCommand {
-    Move(MoveCommand),
-    Attack(AttackCommand),
-    SufferDamage(SufferDamageCommand),
-    AddCondition(AddConditionCommand),
-    RemoveCondition(RemoveConditionCommand),
-}
-
 pub enum ScenarionCommandExecuteResult {
     Pending,
     Done(Vec<ScenarioCommand>),
 }
 
-impl ScenarioCommand {
-    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
-        match self {
-            Self::Move(move_command) => move_command.execute(world),
-            Self::Attack(attack_command) => attack_command.execute(world),
-            Self::SufferDamage(suffer_damage_command) => suffer_damage_command.execute(world),
-            Self::AddCondition(add_condition_command) => add_condition_command.execute(world),
-            Self::RemoveCondition(remove_condition_command) => {
-                remove_condition_command.execute(world)
-            }
-        }
-    }
+#[enum_dispatch]
+trait ScenarioCommandTrait {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult;
 
-    fn undo(self, world: &mut World) -> Self {
-        match self {
-            Self::Move(move_command) => move_command.undo(world),
-            Self::Attack(attack_command) => attack_command.undo(world),
-            Self::SufferDamage(suffer_damage_command) => suffer_damage_command.undo(world),
-            Self::AddCondition(add_condition_command) => add_condition_command.undo(world),
-            Self::RemoveCondition(remove_condition_command) => remove_condition_command.undo(world),
-        }
-    }
+    fn undo(self, world: &mut World) -> ScenarioCommand;
+}
+
+#[allow(clippy::enum_variant_names)]
+#[enum_dispatch(ScenarioCommandTrait)]
+#[derive(Debug, Clone, Reflect)]
+pub enum ScenarioCommand {
+    MoveCommand,
+    AttackCommand,
+    SufferDamageCommand,
+    AddConditionCommand,
+    RemoveConditionCommand,
 }
 
 #[derive(Debug, Default, Clone, Copy, Reflect)]
@@ -160,7 +144,9 @@ impl MoveCommand {
         self.kind = kind;
         self
     }
+}
 
+impl ScenarioCommandTrait for MoveCommand {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity_world_mut = world.entity_mut(self.entity);
         let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
@@ -187,12 +173,6 @@ impl MoveCommand {
     }
 }
 
-impl From<MoveCommand> for ScenarioCommand {
-    fn from(value: MoveCommand) -> Self {
-        Self::Move(value)
-    }
-}
-
 #[derive(Debug, Clone, Reflect)]
 pub struct AttackCommand {
     source: Entity,
@@ -203,7 +183,9 @@ impl AttackCommand {
     pub fn new(source: Entity, target: Entity) -> Self {
         Self { source, target }
     }
+}
 
+impl ScenarioCommandTrait for AttackCommand {
     fn execute(&mut self, _world: &mut World) -> ScenarionCommandExecuteResult {
         /* TODO: Store pending attack on one of the entities and add additional commands for modifier deck, etc. */
 
@@ -219,12 +201,6 @@ impl AttackCommand {
         /* I think you dont do anything? Maybe some resource on the source */
 
         self.into()
-    }
-}
-
-impl From<AttackCommand> for ScenarioCommand {
-    fn from(value: AttackCommand) -> Self {
-        Self::Attack(value)
     }
 }
 
@@ -245,7 +221,9 @@ impl SufferDamageCommand {
             actual_damage: Default::default(),
         }
     }
+}
 
+impl ScenarioCommandTrait for SufferDamageCommand {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut target = world.entity_mut(self.target);
         let mut health = target.get_mut::<Health>().unwrap();
@@ -270,12 +248,6 @@ impl SufferDamageCommand {
     }
 }
 
-impl From<SufferDamageCommand> for ScenarioCommand {
-    fn from(value: SufferDamageCommand) -> Self {
-        Self::SufferDamage(value)
-    }
-}
-
 #[derive(Debug, Clone, Reflect)]
 pub struct AddConditionCommand {
     entity: Entity,
@@ -291,7 +263,9 @@ impl AddConditionCommand {
             added: Default::default(),
         }
     }
+}
 
+impl ScenarioCommandTrait for AddConditionCommand {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity = world.entity_mut(self.entity);
         let mut conditions = entity.get_mut::<Conditions>().unwrap();
@@ -319,12 +293,6 @@ impl AddConditionCommand {
     }
 }
 
-impl From<AddConditionCommand> for ScenarioCommand {
-    fn from(value: AddConditionCommand) -> Self {
-        Self::AddCondition(value)
-    }
-}
-
 #[derive(Debug, Clone, Reflect)]
 pub struct RemoveConditionCommand {
     entity: Entity,
@@ -340,7 +308,9 @@ impl RemoveConditionCommand {
             removed: Default::default(),
         }
     }
+}
 
+impl ScenarioCommandTrait for RemoveConditionCommand {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity = world.entity_mut(self.entity);
         let mut conditions = entity.get_mut::<Conditions>().unwrap();
@@ -365,11 +335,5 @@ impl RemoveConditionCommand {
             ..self
         };
         command.into()
-    }
-}
-
-impl From<RemoveConditionCommand> for ScenarioCommand {
-    fn from(value: RemoveConditionCommand) -> Self {
-        Self::RemoveCondition(value)
     }
 }
