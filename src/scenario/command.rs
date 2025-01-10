@@ -44,8 +44,10 @@ pub struct ScenarioCommandQueue {
 impl ScenarioCommandQueue {
     pub fn undo(&mut self, world: &mut World) {
         if let Some(command) = self.history.pop() {
-            command.undo(world);
             self.pending.clear();
+
+            let command = command.undo(world);
+            self.pending.push_back(command);
         }
     }
 
@@ -107,7 +109,7 @@ impl ScenarioCommand {
         }
     }
 
-    fn undo(&self, world: &mut World) {
+    fn undo(self, world: &mut World) -> Self {
         match self {
             Self::Move(move_command) => move_command.undo(world),
             Self::Attack(attack_command) => attack_command.undo(world),
@@ -161,11 +163,17 @@ impl MoveCommand {
         vec![]
     }
 
-    fn undo(&self, world: &mut World) {
+    fn undo(self, world: &mut World) -> ScenarioCommand {
         let mut entity_world_mut = world.entity_mut(self.entity);
         let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
 
         hex_position.update(self.start.unwrap()); /* TODO: This does not work correctly, because the last_position is lost on HexPosition; But probably not necessary anyways? */
+
+        let command = Self {
+            start: None,
+            ..self
+        };
+        command.into()
     }
 }
 
@@ -192,8 +200,10 @@ impl AttackCommand {
         vec![SufferDamageCommand::new(self.source, self.target, 2).into()]
     }
 
-    fn undo(&self, _world: &mut World) {
+    fn undo(self, _world: &mut World) -> ScenarioCommand {
         /* I think you dont do anything? Maybe some resource on the source */
+
+        self.into()
     }
 }
 
@@ -229,12 +239,18 @@ impl SufferDamageCommand {
         vec![]
     }
 
-    fn undo(&self, world: &mut World) {
+    fn undo(self, world: &mut World) -> ScenarioCommand {
         let mut target = world.entity_mut(self.target);
         let mut health = target.get_mut::<Health>().unwrap();
 
         /* TODO: Might not want to make this heal for semantic reasons */
         health.heal(self.actual_damage.unwrap());
+
+        let command = Self {
+            actual_damage: None,
+            ..self
+        };
+        command.into()
     }
 }
 
@@ -270,7 +286,7 @@ impl AddConditionCommand {
         vec![]
     }
 
-    fn undo(&self, world: &mut World) {
+    fn undo(self, world: &mut World) -> ScenarioCommand {
         /* Only undo if a condition was actually added this way */
         if self.added {
             let mut entity: EntityWorldMut<'_> = world.entity_mut(self.entity);
@@ -278,6 +294,12 @@ impl AddConditionCommand {
 
             conditions.remove_condition(self.condition);
         }
+
+        let command = Self {
+            added: false,
+            ..self
+        };
+        command.into()
     }
 }
 
@@ -313,7 +335,7 @@ impl RemoveConditionCommand {
         vec![]
     }
 
-    fn undo(&self, world: &mut World) {
+    fn undo(self, world: &mut World) -> ScenarioCommand {
         /* Only undo if a condition was actually removed this way */
         if self.removed {
             let mut entity: EntityWorldMut<'_> = world.entity_mut(self.entity);
@@ -321,6 +343,12 @@ impl RemoveConditionCommand {
 
             conditions.add_condition(self.condition);
         }
+
+        let command = Self {
+            removed: false,
+            ..self
+        };
+        command.into()
     }
 }
 
