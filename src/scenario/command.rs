@@ -53,11 +53,16 @@ impl ScenarioCommandQueue {
 
     pub fn execute(&mut self, world: &mut World) {
         if let Some(mut command) = self.pending.pop_front() {
-            let mut commands: VecDeque<ScenarioCommand> = command.execute(world).into();
-            self.history.push(command);
+            match command.execute(world) {
+                ScenarionCommandExecuteResult::Pending => return,
+                ScenarionCommandExecuteResult::Done(commands) => {
+                    let mut commands: VecDeque<_> = commands.into();
+                    self.history.push(command);
 
-            commands.append(&mut self.pending);
-            self.pending = commands;
+                    commands.append(&mut self.pending);
+                    self.pending = commands;
+                }
+            }
         }
     }
 
@@ -96,8 +101,13 @@ pub enum ScenarioCommand {
     RemoveCondition(RemoveConditionCommand),
 }
 
+pub enum ScenarionCommandExecuteResult {
+    Pending,
+    Done(Vec<ScenarioCommand>),
+}
+
 impl ScenarioCommand {
-    fn execute(&mut self, world: &mut World) -> Vec<Self> {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         match self {
             Self::Move(move_command) => move_command.execute(world),
             Self::Attack(attack_command) => attack_command.execute(world),
@@ -151,7 +161,7 @@ impl MoveCommand {
         self
     }
 
-    fn execute(&mut self, world: &mut World) -> Vec<ScenarioCommand> {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity_world_mut = world.entity_mut(self.entity);
         let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
         self.start = Some(hex_position.hex());
@@ -160,7 +170,7 @@ impl MoveCommand {
         println!("Move {} to {:?}", self.entity, self.end);
 
         /* Reactivity how? Via an event that is consumed and someone adds to the queue? */
-        vec![]
+        ScenarionCommandExecuteResult::Done(vec![])
     }
 
     fn undo(self, world: &mut World) -> ScenarioCommand {
@@ -194,10 +204,15 @@ impl AttackCommand {
         Self { source, target }
     }
 
-    fn execute(&mut self, _world: &mut World) -> Vec<ScenarioCommand> {
+    fn execute(&mut self, _world: &mut World) -> ScenarionCommandExecuteResult {
         /* TODO: Store pending attack on one of the entities and add additional commands for modifier deck, etc. */
 
-        vec![SufferDamageCommand::new(self.source, self.target, 2).into()]
+        ScenarionCommandExecuteResult::Done(vec![SufferDamageCommand::new(
+            self.source,
+            self.target,
+            2,
+        )
+        .into()])
     }
 
     fn undo(self, _world: &mut World) -> ScenarioCommand {
@@ -231,12 +246,13 @@ impl SufferDamageCommand {
         }
     }
 
-    fn execute(&mut self, world: &mut World) -> Vec<ScenarioCommand> {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut target = world.entity_mut(self.target);
         let mut health = target.get_mut::<Health>().unwrap();
         self.actual_damage = Some(health.suffer(self.damage));
 
-        vec![]
+        /* TODO: Should be Pending until user input event is received */
+        ScenarionCommandExecuteResult::Done(vec![])
     }
 
     fn undo(self, world: &mut World) -> ScenarioCommand {
@@ -276,14 +292,14 @@ impl AddConditionCommand {
         }
     }
 
-    fn execute(&mut self, world: &mut World) -> Vec<ScenarioCommand> {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity = world.entity_mut(self.entity);
         let mut conditions = entity.get_mut::<Conditions>().unwrap();
 
         self.added = !conditions.has(self.condition) && !conditions.is_immune(self.condition);
         conditions.add_condition(self.condition);
 
-        vec![]
+        ScenarionCommandExecuteResult::Done(vec![])
     }
 
     fn undo(self, world: &mut World) -> ScenarioCommand {
@@ -325,14 +341,14 @@ impl RemoveConditionCommand {
         }
     }
 
-    fn execute(&mut self, world: &mut World) -> Vec<ScenarioCommand> {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
         let mut entity = world.entity_mut(self.entity);
         let mut conditions = entity.get_mut::<Conditions>().unwrap();
 
         self.removed = conditions.has(self.condition);
         conditions.remove_condition(self.condition);
 
-        vec![]
+        ScenarionCommandExecuteResult::Done(vec![])
     }
 
     fn undo(self, world: &mut World) -> ScenarioCommand {
