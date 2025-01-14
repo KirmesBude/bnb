@@ -8,6 +8,7 @@ use super::HexPosition;
 use crate::figure::{
     condition::{ConditionKind, Conditions},
     health::Health,
+    modifier::RollModifierCommand,
 };
 
 /* Everything that happens in the scenario needs to be recorded (and maybe this is the source of truth?) */
@@ -96,15 +97,15 @@ pub enum ScenarionCommandExecuteResult {
     Done(Vec<ScenarioCommand>),
 }
 
-#[enum_dispatch]
-trait ScenarioCommandTrait {
+#[enum_dispatch(ScenarioCommand)]
+pub trait ScenarioCommandTrait {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult;
 
     fn undo(self, world: &mut World) -> ScenarioCommand;
 }
 
 #[allow(clippy::enum_variant_names)]
-#[enum_dispatch(ScenarioCommandTrait)]
+#[enum_dispatch]
 #[derive(Debug, Clone, Reflect)]
 pub enum ScenarioCommand {
     MoveCommand,
@@ -112,6 +113,7 @@ pub enum ScenarioCommand {
     SufferDamageCommand,
     AddConditionCommand,
     RemoveConditionCommand,
+    RollModifierCommand,
 }
 
 #[derive(Debug, Default, Clone, Copy, Reflect)]

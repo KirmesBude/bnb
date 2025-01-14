@@ -2,6 +2,7 @@ mod action;
 mod demo;
 mod figure;
 mod game;
+mod player;
 mod scenario;
 
 use action::ActionPlugin;

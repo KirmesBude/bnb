@@ -1,5 +1,8 @@
+pub mod attack;
 pub mod condition;
 pub mod health;
+pub mod modifier;
+pub mod movement;
 
 /* What does a Figure need? */
 /* Initiative or is that different? Active Ability? */
@@ -11,6 +14,7 @@ pub mod health;
 use bevy::{prelude::*, utils::HashMap};
 use condition::{ConditionKind, Conditions};
 use health::Health;
+use modifier::{Modifier, ModifierStack, ModifierTray, ModifierTrayColumn, ModifierTrays};
 
 use crate::scenario::HexPosition;
 
@@ -22,6 +26,15 @@ impl Plugin for FigurePlugin {
             .register_type::<Health>()
             .register_type::<Conditions>()
             .register_type::<ConditionKind>();
+
+        app.register_type::<FigureId>();
+
+        app.register_type::<Modifier>()
+            .register_type::<ModifierStack>()
+            .register_type::<ModifierTrayColumn>()
+            .register_type::<ModifierTray>()
+            .register_type::<ModifierTrays>();
+        app.init_resource::<ModifierTrays>();
     }
 }
 
@@ -51,7 +64,7 @@ pub struct ActiveBonuses {
 /* This is an identifier for each type of figure. */
 /* e.g. Craigheart might be 0 and Skeleton might be 1 */
 /* TODO: Summons should have the same id as the owner */
-#[derive(Debug, Component, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect)]
 pub struct FigureId(u32);
 
 impl FigureId {
