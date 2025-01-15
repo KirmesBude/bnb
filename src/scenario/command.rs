@@ -6,6 +6,7 @@ use hexx::Hex;
 
 use super::HexPosition;
 use crate::figure::{
+    attack::{ApplyAttackCommand, AttackCommand},
     condition::{ConditionKind, Conditions},
     health::Health,
     modifier::RollModifierCommand,
@@ -110,6 +111,7 @@ pub trait ScenarioCommandTrait {
 pub enum ScenarioCommand {
     MoveCommand,
     AttackCommand,
+    ApplyAttackCommand,
     SufferDamageCommand,
     AddConditionCommand,
     RemoveConditionCommand,
@@ -172,37 +174,6 @@ impl ScenarioCommandTrait for MoveCommand {
             ..self
         };
         command.into()
-    }
-}
-
-#[derive(Debug, Clone, Reflect)]
-pub struct AttackCommand {
-    source: Entity,
-    target: Entity,
-}
-
-impl AttackCommand {
-    pub fn new(source: Entity, target: Entity) -> Self {
-        Self { source, target }
-    }
-}
-
-impl ScenarioCommandTrait for AttackCommand {
-    fn execute(&mut self, _world: &mut World) -> ScenarionCommandExecuteResult {
-        /* TODO: Store pending attack on one of the entities and add additional commands for modifier deck, etc. */
-
-        ScenarionCommandExecuteResult::Done(vec![SufferDamageCommand::new(
-            self.source,
-            self.target,
-            2,
-        )
-        .into()])
-    }
-
-    fn undo(self, _world: &mut World) -> ScenarioCommand {
-        /* I think you dont do anything? Maybe some resource on the source */
-
-        self.into()
     }
 }
 

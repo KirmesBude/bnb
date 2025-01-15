@@ -1,8 +1,10 @@
 use crate::{
     figure::{
+        attack::{Attack, AttackCommand, PendingAttack},
         condition::{ConditionKind, Conditions},
         health::Health,
-        FigureBundle,
+        modifier::{Modifier, ModifierTray},
+        FigureBundle, FigureId,
     },
     scenario::command::{AddConditionCommand, RemoveConditionCommand},
 };
@@ -15,7 +17,7 @@ use bevy::{
 use hexx::{shapes, Hex, HexLayout, HexOrientation, PlaneMeshBuilder};
 
 use crate::scenario::{
-    command::{AttackCommand, MoveCommand, ScenarioCommandQueue},
+    command::{MoveCommand, ScenarioCommandQueue},
     HexGrid, HexLayer, HexPosition,
 };
 
@@ -82,6 +84,8 @@ fn setup(
             hex_position: HexPosition::new(Hex::new(0, 0), HexLayer::Figure),
             health: Health::new(12),
             conditions: Conditions::new(&[]),
+            pending_attack: PendingAttack::default(),
+            id: FigureId::new(0),
         })
         .id();
 
@@ -92,8 +96,22 @@ fn setup(
             hex_position: HexPosition::new(Hex::new(2, 1), HexLayer::Figure),
             health: Health::new(12),
             conditions: Conditions::new(&[ConditionKind::Muddle]),
+            pending_attack: PendingAttack::default(),
+            id: FigureId::new(1),
         })
         .id();
+
+    commands.spawn(ModifierTray::new(
+        FigureId::new(0),
+        [
+            [Modifier::zero(), Modifier::crit(), Modifier::zero()],
+            [Modifier::zero(), Modifier::zero(), Modifier::zero()],
+            [Modifier::zero(), Modifier::zero(), Modifier::zero()],
+            [Modifier::zero(), Modifier::zero(), Modifier::zero()],
+            [Modifier::zero(), Modifier::zero(), Modifier::zero()],
+            [Modifier::zero(), Modifier::zero(), Modifier::zero()],
+        ],
+    ));
 
     commands
         .spawn(HexGrid::new(layout))
@@ -101,9 +119,10 @@ fn setup(
         .add_children(&[figure_a, figure_b]);
 
     let new_commands = vec![
+        AddConditionCommand::new(figure_b, ConditionKind::Poison).into(),
         MoveCommand::new(figure_a, Hex::new(1, 0)).into(),
         MoveCommand::new(figure_a, Hex::new(1, 1)).into(),
-        AttackCommand::new(figure_a, figure_b).into(),
+        AttackCommand::new(figure_a, Attack::new(figure_b, 2)).into(),
         AddConditionCommand::new(figure_b, ConditionKind::Muddle).into(),
         AddConditionCommand::new(figure_b, ConditionKind::Wound).into(),
         RemoveConditionCommand::new(figure_b, ConditionKind::Muddle).into(),

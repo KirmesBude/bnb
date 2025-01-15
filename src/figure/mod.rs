@@ -11,6 +11,7 @@ pub mod movement;
 /* CalculatedRetaliate: Base [+] any bonuses as Retaliate(usize, usize) */
 /* AttackEffects: Vec of AttackEffects that are added to any attack this figure does */
 
+use attack::PendingAttack;
 use bevy::{prelude::*, utils::HashMap};
 use condition::{ConditionKind, Conditions};
 use health::Health;
@@ -45,6 +46,8 @@ pub struct FigureBundle {
     pub hex_position: HexPosition,
     pub health: Health,
     pub conditions: Conditions,
+    pub pending_attack: PendingAttack,
+    pub id: FigureId,
 }
 
 /* TODO: Or should those be marker component to query for? */
@@ -68,7 +71,7 @@ pub struct ActiveBonuses {
 pub struct FigureId(u32);
 
 impl FigureId {
-    pub fn _new(id: u32) -> Self {
+    pub fn new(id: u32) -> Self {
         Self(id)
     }
 }
