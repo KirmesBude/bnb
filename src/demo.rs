@@ -1,6 +1,6 @@
 use crate::{
     figure::{
-        attack::{Attack, AttackCommand, PendingAttack},
+        attack::{Attack, AttackCommand},
         condition::{ConditionKind, Conditions},
         health::Health,
         modifier::{Modifier, ModifierTray},
@@ -84,7 +84,6 @@ fn setup(
             hex_position: HexPosition::new(Hex::new(0, 0), HexLayer::Figure),
             health: Health::new(12),
             conditions: Conditions::new(&[]),
-            pending_attack: PendingAttack::default(),
             id: FigureId::new(0),
         })
         .id();
@@ -96,7 +95,6 @@ fn setup(
             hex_position: HexPosition::new(Hex::new(2, 1), HexLayer::Figure),
             health: Health::new(12),
             conditions: Conditions::new(&[ConditionKind::Muddle]),
-            pending_attack: PendingAttack::default(),
             id: FigureId::new(1),
         })
         .id();

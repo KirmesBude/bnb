@@ -8,7 +8,7 @@ use crate::scenario::command::{
     ScenarioCommand, ScenarioCommandTrait, ScenarionCommandExecuteResult,
 };
 
-use super::{attack::PendingAttack, FigureId};
+use super::FigureId;
 
 /*
     This defines ModifierTray (component) entities for each figure id
@@ -57,34 +57,12 @@ impl Modifier {
     pub fn crit() -> Self {
         Self::Multiply(2)
     }
-}
 
-// TODO: Is this a component?
-// TODO: I think this should not exist like this, there are no rolling right now
-#[derive(Debug, Default, Clone, Reflect)]
-pub struct ModifierStack(Vec<Modifier>);
-
-impl ModifierStack {
-    pub fn apply(&self, damage: usize) -> usize {
-        self.0
-            .iter()
-            .fold(damage as isize, |acc, modifier| match modifier {
-                Modifier::Add(x) => acc + *x as isize,
-                Modifier::Multiply(x) => acc * *x as isize,
-            })
-            .max(0) as usize
-    }
-
-    pub fn push(&mut self, modifier: Modifier) {
-        self.0.push(modifier);
-    }
-
-    pub fn pop(&mut self) -> Option<Modifier> {
-        self.0.pop()
-    }
-
-    pub fn clear(&mut self) {
-        self.0.clear();
+    pub fn apply(&self, value: i8) -> i8 {
+        match self {
+            Modifier::Add(x) => value + x,
+            Modifier::Multiply(x) => value * x,
+        }
     }
 }
 
@@ -155,6 +133,7 @@ impl ModifierTrays {
 pub struct RollModifierCommand {
     entity: Entity,
     previous_row: Option<usize>,
+    modifier: Option<Modifier>,
 }
 
 impl RollModifierCommand {
@@ -162,7 +141,12 @@ impl RollModifierCommand {
         Self {
             entity,
             previous_row: None,
+            modifier: None,
         }
+    }
+
+    pub fn modifier(&self) -> Option<Modifier> {
+        self.modifier
     }
 }
 
@@ -181,8 +165,7 @@ impl ScenarioCommandTrait for RollModifierCommand {
         let modifier = modifier_tray.get(column);
         modifier_tray.next_row();
 
-        let mut pending_attack = world.get_mut::<PendingAttack>(self.entity).unwrap();
-        pending_attack.get_modifiers_mut().push(modifier);
+        self.modifier = Some(modifier);
 
         ScenarionCommandExecuteResult::Done(vec![])
     }
@@ -196,15 +179,11 @@ impl ScenarioCommandTrait for RollModifierCommand {
 
         modifier_tray.active_row = self.previous_row.unwrap();
 
-        let mut pending_attack = world.get_mut::<PendingAttack>(self.entity).unwrap();
-        pending_attack.get_modifiers_mut().pop();
-
         let command = Self {
             previous_row: None,
+            modifier: None,
             ..self
         };
         command.into()
     }
 }
-
-/* TODO: ClearModifierStack needs to be a command */

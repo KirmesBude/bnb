@@ -11,11 +11,10 @@ pub mod movement;
 /* CalculatedRetaliate: Base [+] any bonuses as Retaliate(usize, usize) */
 /* AttackEffects: Vec of AttackEffects that are added to any attack this figure does */
 
-use attack::PendingAttack;
 use bevy::{prelude::*, utils::HashMap};
 use condition::{ConditionKind, Conditions};
 use health::Health;
-use modifier::{Modifier, ModifierStack, ModifierTray, ModifierTrayColumn, ModifierTrays};
+use modifier::{Modifier, ModifierTray, ModifierTrayColumn, ModifierTrays};
 
 use crate::scenario::HexPosition;
 
@@ -31,7 +30,6 @@ impl Plugin for FigurePlugin {
         app.register_type::<FigureId>();
 
         app.register_type::<Modifier>()
-            .register_type::<ModifierStack>()
             .register_type::<ModifierTrayColumn>()
             .register_type::<ModifierTray>()
             .register_type::<ModifierTrays>();
@@ -46,7 +44,6 @@ pub struct FigureBundle {
     pub hex_position: HexPosition,
     pub health: Health,
     pub conditions: Conditions,
-    pub pending_attack: PendingAttack,
     pub id: FigureId,
 }
 

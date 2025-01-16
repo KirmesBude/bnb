@@ -72,6 +72,11 @@ impl ScenarioCommandQueue {
     pub fn queue(&mut self, commands: Vec<ScenarioCommand>) {
         self.pending.extend(commands);
     }
+
+    /// History recent to oldest
+    pub fn history(&self) -> impl Iterator<Item = &ScenarioCommand> {
+        self.history.iter().rev()
+    }
 }
 
 fn step_commands(world: &mut World) {

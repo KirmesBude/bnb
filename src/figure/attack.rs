@@ -1,40 +1,15 @@
 use bevy::prelude::*;
 
 use crate::scenario::command::{
-    ScenarioCommand, ScenarioCommandTrait, ScenarionCommandExecuteResult, SufferDamageCommand,
+    ScenarioCommand, ScenarioCommandQueue, ScenarioCommandTrait, ScenarionCommandExecuteResult,
+    SufferDamageCommand,
 };
 
-use super::{
-    condition::Conditions,
-    modifier::{ModifierStack, RollModifierCommand},
-};
+use super::{condition::Conditions, modifier::RollModifierCommand};
 
 /* Lets try having this be a component. Not sure if that is a good idea */
 
-#[derive(Debug, Default, Clone, Component, Reflect)]
-pub struct PendingAttack {
-    attack: Option<Attack>,
-    modifiers: ModifierStack,
-}
-
-impl PendingAttack {
-    pub fn new(attack: Attack) -> Self {
-        Self {
-            attack: Some(attack),
-            modifiers: Default::default(),
-        }
-    }
-
-    pub fn get_modifiers_mut(&mut self) -> &mut ModifierStack {
-        &mut self.modifiers
-    }
-
-    pub fn get_attack(&self) -> Option<&Attack> {
-        self.attack.as_ref()
-    }
-}
-
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Copy, Reflect)]
 pub struct Attack {
     target: Entity,
     value: usize,
@@ -59,12 +34,7 @@ impl AttackCommand {
 }
 
 impl ScenarioCommandTrait for AttackCommand {
-    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
-        /* Initialize Pending Attack */
-        let mut pending_attack = world.get_mut::<PendingAttack>(self.source).unwrap();
-        pending_attack.attack = Some(self.attack.clone());
-        pending_attack.modifiers.clear();
-
+    fn execute(&mut self, _world: &mut World) -> ScenarionCommandExecuteResult {
         /* Queue up RollModifierCommand */
         /* Queue up ApplyAttackCommand */
         ScenarionCommandExecuteResult::Done(vec![
@@ -83,37 +53,51 @@ impl ScenarioCommandTrait for AttackCommand {
 #[derive(Debug, Clone, Reflect)]
 pub struct ApplyAttackCommand {
     source: Entity,
-    pending_attack: Option<PendingAttack>,
 }
 
 impl ApplyAttackCommand {
     pub fn new(source: Entity) -> Self {
-        Self {
-            source,
-            pending_attack: None,
-        }
+        Self { source }
     }
 }
 
 impl ScenarioCommandTrait for ApplyAttackCommand {
     fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
-        /* Retrieve pending attack from source entity */
-        let pending_attack = world.get::<PendingAttack>(self.source).unwrap();
-        self.pending_attack = Some(pending_attack.clone());
+        /* Retrieve last attack command and any modifier commands from queue */
+        let queue = world.get_resource::<ScenarioCommandQueue>().unwrap();
+        let (attack, modifiers) = {
+            let history = queue.history();
+            let mut attack = None;
+            let mut modifiers = vec![];
+
+            for command in history {
+                match command {
+                    ScenarioCommand::AttackCommand(attack_command) => {
+                        attack = Some(attack_command.attack);
+                        break;
+                    }
+                    ScenarioCommand::RollModifierCommand(roll_modifier_command) => {
+                        modifiers.push(roll_modifier_command.modifier().unwrap())
+                    }
+                    _ => {}
+                }
+            }
+
+            (attack.unwrap(), modifiers)
+        };
 
         /* Retrieve target entity and conditions */
-        let target = pending_attack.get_attack().unwrap().target;
-        let target_conditions = world.get::<Conditions>(target).unwrap();
+        let target_conditions = world.get::<Conditions>(attack.target).unwrap();
 
         /* Attack bonusse and pentalties (e.g. poison and items) */
-        let mut damage = pending_attack.get_attack().unwrap().value;
+        let mut damage = attack.value;
         if target_conditions.has(super::condition::ConditionKind::Poison) {
             damage += 1;
         }
 
         /* Apply attack modifier */
-        /* TODO: Fix this casting madness */
-        damage = pending_attack.modifiers.apply(damage);
+        /* TODO: Fix casting */
+        modifiers.iter().fold(damage as i8, |acc, x| x.apply(acc));
 
         /* Calculate versus target shield */
         /* TODO: Implement this */
@@ -122,20 +106,15 @@ impl ScenarioCommandTrait for ApplyAttackCommand {
         /* TODO: Queue up Retaliate stuff */
         ScenarionCommandExecuteResult::Done(vec![SufferDamageCommand::new(
             self.source,
-            target,
+            attack.target,
             damage,
         )
         .into()])
     }
 
-    fn undo(self, world: &mut World) -> ScenarioCommand {
-        let mut pending_attack = world.get_mut::<PendingAttack>(self.source).unwrap();
-        *pending_attack = self.pending_attack.unwrap();
+    fn undo(self, _world: &mut World) -> ScenarioCommand {
+        /* TODO: Consider undoing up to AttackCommand? */
 
-        let command = Self {
-            pending_attack: None,
-            ..self
-        };
-        command.into()
+        self.into()
     }
 }
