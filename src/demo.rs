@@ -6,7 +6,10 @@ use crate::{
         modifier::{Modifier, ModifierTray},
         FigureBundle, FigureId,
     },
-    scenario::command::{AddConditionCommand, RemoveConditionCommand},
+    scenario::{
+        command::{AddConditionCommand, RemoveConditionCommand},
+        map::{HexGrid, HexLayer, HexPosition},
+    },
 };
 use bevy::{
     asset::RenderAssetUsages,
@@ -16,10 +19,7 @@ use bevy::{
 };
 use hexx::{shapes, Hex, HexLayout, HexOrientation, PlaneMeshBuilder};
 
-use crate::scenario::{
-    command::{MoveCommand, ScenarioCommandQueue},
-    HexGrid, HexLayer, HexPosition,
-};
+use crate::scenario::command::{MoveCommand, ScenarioCommandQueue};
 
 pub struct DemoPlugin;
 

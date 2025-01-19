@@ -16,7 +16,7 @@ use condition::{ConditionKind, Conditions};
 use health::Health;
 use modifier::{Modifier, ModifierTray, ModifierTrayColumn, ModifierTrays};
 
-use crate::scenario::HexPosition;
+use crate::scenario::map::HexPosition;
 
 pub struct FigurePlugin;
 
