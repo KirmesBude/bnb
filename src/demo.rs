@@ -4,6 +4,7 @@ use crate::{
         condition::{ConditionKind, Conditions},
         health::Health,
         modifier::{Modifier, ModifierTray},
+        movement::MoveCommand,
         FigureBundle, FigureId,
     },
     scenario::{
@@ -19,7 +20,7 @@ use bevy::{
 };
 use hexx::{shapes, Hex, HexLayout, HexOrientation, PlaneMeshBuilder};
 
-use crate::scenario::command::{MoveCommand, ScenarioCommandQueue};
+use crate::scenario::command::ScenarioCommandQueue;
 
 pub struct DemoPlugin;
 

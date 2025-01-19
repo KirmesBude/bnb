@@ -91,43 +91,48 @@ impl HexLayer {
 
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_remove = hex_position_on_remove)]
+#[component(on_remove = HexPosition::on_remove)]
 #[require(Transform)]
 pub struct HexPosition {
     hex: Hex,
-    previous_hex: Option<Hex>, /* TODO: Might not be needed if encoded in CommandQueue */
     layer: HexLayer,
 }
 
 impl HexPosition {
     pub fn new(hex: Hex, layer: HexLayer) -> Self {
-        Self {
-            hex,
-            layer,
-            previous_hex: None,
-        }
-    }
-
-    pub fn update(&mut self, hex: Hex) {
-        self.previous_hex = Some(self.hex);
-        self.hex = hex;
+        Self { hex, layer }
     }
 
     pub fn hex(&self) -> Hex {
         self.hex
     }
-}
 
-pub fn hex_position_on_remove(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
-    let (hex, layer, parent) = {
-        let hex_position = world.get::<HexPosition>(entity).unwrap();
-        let parent = world.get::<Parent>(entity).unwrap();
+    pub fn layer(&self) -> HexLayer {
+        self.layer
+    }
 
-        (hex_position.hex, hex_position.layer, parent)
-    };
-    let mut hex_grid = world.get_mut::<HexGrid>(parent.get()).unwrap();
+    pub fn update(&mut self, hex: Hex, entity: Entity, hex_grid: &mut HexGrid) {
+        /* Remove entity if already present */
+        hex_grid.remove(&self.hex, &self.layer);
 
-    hex_grid.remove(&hex, &layer);
+        /* Insert at new place */
+        hex_grid.insert(self.hex, &self.layer, entity);
+
+        /* Update the actual position */
+        self.hex = hex;
+    }
+
+    fn on_remove(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
+        let (hex, layer, parent) = {
+            let hex_position = world.get::<HexPosition>(entity).unwrap();
+            let parent = world.get::<Parent>(entity).unwrap();
+
+            (hex_position.hex, hex_position.layer, parent)
+        };
+        let mut hex_grid = world.get_mut::<HexGrid>(parent.get()).unwrap();
+
+        hex_grid.remove(&hex, &layer);
+    }
 }
 
 /* TODO: Easing */
@@ -142,20 +147,6 @@ pub fn hex_position_to_transform(
             let scale = hex_position.layer.scale();
 
             *transform = Transform::from_xyz(pos.x, pos.y, z).with_scale(scale);
-        }
-    }
-}
-
-pub fn update_hex_position_hashmap(
-    mut hex_grids: Query<&mut HexGrid>,
-    hex_positions: Query<(Entity, &HexPosition, &Parent), Changed<HexPosition>>,
-) {
-    for (entity, hex_position, parent) in &hex_positions {
-        if let Ok(mut hex_grid) = hex_grids.get_mut(parent.get()) {
-            if let Some(previous_hex) = hex_position.previous_hex {
-                hex_grid.remove(&previous_hex, &hex_position.layer);
-            }
-            hex_grid.insert(hex_position.hex, &hex_position.layer, entity);
         }
     }
 }

@@ -75,7 +75,7 @@ pub enum ModifierTrayColumn {
 }
 
 impl ModifierTrayColumn {
-    const len: usize = ModifierTrayColumn::Last as usize;
+    const LEN: usize = ModifierTrayColumn::Last as usize;
 }
 
 #[derive(Debug, Component, Reflect)]
@@ -83,13 +83,13 @@ impl ModifierTrayColumn {
 pub struct ModifierTray {
     id: FigureId,
     active_row: usize,
-    table: [[Modifier; ModifierTrayColumn::len]; ModifierTray::len],
+    table: [[Modifier; ModifierTrayColumn::LEN]; ModifierTray::LEN],
 }
 
 impl ModifierTray {
-    const len: usize = 6;
+    const LEN: usize = 6;
 
-    pub fn new(id: FigureId, table: [[Modifier; ModifierTrayColumn::len]; Self::len]) -> Self {
+    pub fn new(id: FigureId, table: [[Modifier; ModifierTrayColumn::LEN]; Self::LEN]) -> Self {
         Self {
             id,
             table,
@@ -102,7 +102,7 @@ impl ModifierTray {
     }
 
     pub fn next_row(&mut self) {
-        self.active_row = (self.active_row + 1) % Self::len;
+        self.active_row = (self.active_row + 1) % Self::LEN;
     }
 
     fn on_add(mut world: DeferredWorld, entity: Entity, _: ComponentId) {

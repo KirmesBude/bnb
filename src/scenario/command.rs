@@ -2,14 +2,13 @@ use std::collections::VecDeque;
 
 use bevy::prelude::*;
 use enum_dispatch::enum_dispatch;
-use hexx::Hex;
 
-use super::HexPosition;
 use crate::figure::{
     attack::{ApplyAttackCommand, AttackCommand},
     condition::{ConditionKind, Conditions},
     health::Health,
     modifier::RollModifierCommand,
+    movement::{MoveCommand, MovementKind},
 };
 
 /* Everything that happens in the scenario needs to be recorded (and maybe this is the source of truth?) */
@@ -121,65 +120,6 @@ pub enum ScenarioCommand {
     AddConditionCommand,
     RemoveConditionCommand,
     RollModifierCommand,
-}
-
-#[derive(Debug, Default, Clone, Copy, Reflect)]
-pub enum MovementKind {
-    #[default]
-    Default,
-    Jump,
-    Fly,
-}
-
-#[derive(Debug, Clone, Reflect)]
-pub struct MoveCommand {
-    entity: Entity,
-    start: Option<Hex>,
-    end: Hex,
-    kind: MovementKind,
-}
-
-impl MoveCommand {
-    pub fn new(entity: Entity, hex: Hex) -> Self {
-        Self {
-            entity,
-            end: hex,
-            start: Default::default(),
-            kind: Default::default(),
-        }
-    }
-
-    pub fn _with_kind(mut self, kind: MovementKind) -> Self {
-        self.kind = kind;
-        self
-    }
-}
-
-impl ScenarioCommandTrait for MoveCommand {
-    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
-        let mut entity_world_mut = world.entity_mut(self.entity);
-        let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
-        self.start = Some(hex_position.hex());
-        hex_position.update(self.end);
-
-        println!("Move {} to {:?}", self.entity, self.end);
-
-        /* Reactivity how? Via an event that is consumed and someone adds to the queue? */
-        ScenarionCommandExecuteResult::Done(vec![])
-    }
-
-    fn undo(self, world: &mut World) -> ScenarioCommand {
-        let mut entity_world_mut = world.entity_mut(self.entity);
-        let mut hex_position = entity_world_mut.get_mut::<HexPosition>().unwrap();
-
-        hex_position.update(self.start.unwrap()); /* TODO: This does not work correctly, because the last_position is lost on HexPosition; But probably not necessary anyways? */
-
-        let command = Self {
-            start: None,
-            ..self
-        };
-        command.into()
-    }
 }
 
 #[derive(Debug, Clone, Reflect)]
