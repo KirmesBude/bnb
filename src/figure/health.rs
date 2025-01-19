@@ -1,5 +1,9 @@
 use bevy::prelude::*;
 
+use crate::scenario::command::{
+    ScenarioCommand, ScenarioCommandTrait, ScenarionCommandExecuteResult,
+};
+
 #[derive(Debug, Default, Component, Reflect)]
 pub struct CalculatedHealth(usize);
 
@@ -35,4 +39,48 @@ impl Health {
 #[derive(Debug, Event, Reflect)]
 pub struct Healed {
     pub entity: Entity,
+}
+
+#[derive(Debug, Clone, Reflect)]
+pub struct SufferDamageCommand {
+    source: Entity,
+    target: Entity,
+    damage: usize,
+    actual_damage: Option<usize>,
+}
+
+impl SufferDamageCommand {
+    pub fn new(source: Entity, target: Entity, damage: usize) -> Self {
+        Self {
+            source,
+            target,
+            damage,
+            actual_damage: Default::default(),
+        }
+    }
+}
+
+impl ScenarioCommandTrait for SufferDamageCommand {
+    fn execute(&mut self, world: &mut World) -> ScenarionCommandExecuteResult {
+        let mut target = world.entity_mut(self.target);
+        let mut health = target.get_mut::<Health>().unwrap();
+        self.actual_damage = Some(health.suffer(self.damage));
+
+        /* TODO: Should be Pending until user input event is received */
+        ScenarionCommandExecuteResult::Done(vec![])
+    }
+
+    fn undo(self, world: &mut World) -> ScenarioCommand {
+        let mut target = world.entity_mut(self.target);
+        let mut health = target.get_mut::<Health>().unwrap();
+
+        /* TODO: Might not want to make this heal for semantic reasons */
+        health.heal(self.actual_damage.unwrap());
+
+        let command = Self {
+            actual_damage: None,
+            ..self
+        };
+        command.into()
+    }
 }

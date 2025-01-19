@@ -1,16 +1,13 @@
 use crate::{
     figure::{
         attack::{Attack, AttackCommand},
-        condition::{ConditionKind, Conditions},
+        condition::{AddConditionCommand, ConditionKind, Conditions, RemoveConditionCommand},
         health::Health,
         modifier::{Modifier, ModifierTray},
         movement::MoveCommand,
         FigureBundle, FigureId,
     },
-    scenario::{
-        command::{AddConditionCommand, RemoveConditionCommand},
-        map::{HexGrid, HexLayer, HexPosition},
-    },
+    scenario::map::{HexGrid, HexLayer, HexPosition},
 };
 use bevy::{
     asset::RenderAssetUsages,

@@ -2,10 +2,9 @@ use bevy::prelude::*;
 
 use crate::scenario::command::{
     ScenarioCommand, ScenarioCommandQueue, ScenarioCommandTrait, ScenarionCommandExecuteResult,
-    SufferDamageCommand,
 };
 
-use super::{condition::Conditions, modifier::RollModifierCommand};
+use super::{condition::Conditions, health::SufferDamageCommand, modifier::RollModifierCommand};
 
 /* Lets try having this be a component. Not sure if that is a good idea */
 
