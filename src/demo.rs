@@ -39,7 +39,7 @@ fn setup(
 
     let layout = HexLayout {
         orientation: HexOrientation::Flat,
-        hex_size: HEX_SIZE,
+        scale: HEX_SIZE,
         ..default()
     };
     let mesh = meshes.add(hexagonal_plane(&layout));

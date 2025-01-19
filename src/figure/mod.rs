@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod attack;
 pub mod condition;
 pub mod health;

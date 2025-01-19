@@ -5,8 +5,8 @@ use enum_dispatch::enum_dispatch;
 
 use crate::figure::{
     attack::{ApplyAttackCommand, AttackCommand},
-    condition::{AddConditionCommand, ConditionKind, Conditions, RemoveConditionCommand},
-    health::{Health, SufferDamageCommand},
+    condition::{AddConditionCommand, RemoveConditionCommand},
+    health::SufferDamageCommand,
     modifier::RollModifierCommand,
     movement::{MoveCommand, MovementKind},
 };
