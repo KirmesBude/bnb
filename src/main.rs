@@ -6,6 +6,9 @@ use bevy::{
     window::PrimaryWindow,
 };
 use hexx::{algorithms::a_star, *};
+use scenario_map::setup_map;
+
+pub mod scenario_map;
 
 /// World size of the hexagons (outer radius)
 const HEX_SIZE: Vec2 = Vec2::splat(14.0);
@@ -20,8 +23,8 @@ pub fn main() {
             }),
             ..default()
         }))
-        .add_systems(Startup, (setup_camera, setup_grid))
-        .add_systems(Update, handle_input)
+        .add_systems(Startup, (setup_camera, setup_map))
+        //.add_systems(Update, handle_input)
         .run();
 }
 
@@ -60,12 +63,12 @@ fn setup_grid(
         .enumerate()
         .map(|(i, coord)| {
             let pos = layout.hex_to_world_pos(coord);
-            let material = match coord {
-                c if i != 0 && i % 5 == 0 => {
-                    blocked_coords.insert(c);
-                    blocked_mat.clone()
-                }
-                _ => default_mat.clone(),
+            let material = 
+            if i != 0 && i % 5 == 0 {
+                blocked_coords.insert(coord);
+                blocked_mat.clone()
+            } else {
+                default_mat.clone()
             };
             let entity = commands
                 .spawn((
