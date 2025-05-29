@@ -1,5 +1,11 @@
-use bevy::{asset::RenderAssetUsages, color::palettes::css::{BLACK, WHITE}, platform::collections::{HashMap, HashSet}, prelude::*, render::mesh::{Indices, PrimitiveTopology}};
-use hexx::{shapes::PointyRectangle, Hex, HexLayout, PlaneMeshBuilder};
+use bevy::{
+    asset::RenderAssetUsages,
+    color::palettes::css::{BLACK, WHITE},
+    platform::collections::{HashMap, HashSet},
+    prelude::*,
+    render::mesh::{Indices, PrimitiveTopology},
+};
+use hexx::{Hex, HexLayout, PlaneMeshBuilder, shapes::PointyRectangle};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum OverlayTile {
@@ -17,17 +23,15 @@ impl OverlayTileMaterials {
 
         /* TODO: For each */
         map.insert(OverlayTile::Obstacle, materials.add(Color::Srgba(BLACK)));
-        Self {
-            materials: map,
-        }
+        Self { materials: map }
     }
 }
 
 #[derive(Debug, Resource)]
 pub struct ScenarioMap {
-    pub layout: HexLayout, /* Layout so we can operate on the HexGrid */
+    pub layout: HexLayout,          /* Layout so we can operate on the HexGrid */
     pub base: HashMap<Hex, Entity>, /* Basically ground entities */
-    pub walls: HashSet<(Hex,Hex)>, /* Walls are the contact lines between 2 Hexes */
+    pub walls: HashSet<(Hex, Hex)>, /* Walls are the contact lines between 2 Hexes */
     pub overlay_tiles: HashMap<Hex, Entity>, /* Any overlays, such as obstacles */
     pub figures: HashMap<Hex, Entity>, /* Any figures */
 }
@@ -57,56 +61,47 @@ pub fn setup_map(
     let base_material = materials.add(Color::Srgba(WHITE));
     let overlay_materials = OverlayTileMaterials::new(&mut materials);
     let shape = PointyRectangle {
-        left: -4,
-        right: 3,
-        top: -3,
-        bottom: 3,
+        left: 0,
+        right: 7,
+        top: 0,
+        bottom: 6,
     };
-    let base = shape.coords()
-    .enumerate()
-    .map(|(i, coord)| {
-        let pos = layout.hex_to_world_pos(coord);
-            let material = base_material.clone();
-            let entity = commands
-            .spawn((
-                Mesh2d(mesh.clone()),
-                MeshMaterial2d(material.clone_weak()),
-                Transform::from_xyz(pos.x, pos.y, 0.0),
-            ))
-            .id();
-            (coord, entity)
-    })
-    .collect();
-
-    let obstacles = shape.coords()
+    let base = shape
+        .coords()
         .enumerate()
         .filter_map(|(i, coord)| {
+            if coord == Hex::new(5, 5) || coord == Hex::new(6, 3) || coord == Hex::new(7, 1) {
+                return None;
+            }
             let pos = layout.hex_to_world_pos(coord);
-            if i != 0 && i % 5 == 0 {
-                let material = overlay_materials.materials.get(&OverlayTile::Obstacle).unwrap().clone();
-                let entity = commands
+            let material = base_material.clone();
+            let entity = commands
                 .spawn((
                     Mesh2d(mesh.clone()),
                     MeshMaterial2d(material.clone_weak()),
-                    Transform::from_xyz(pos.x, pos.y, 1.0),
+                    Transform::from_xyz(pos.x, pos.y, 0.0),
+                    children![(
+                        Text2d(format!("{},{}", coord.x, coord.y)),
+                        TextColor(Color::BLACK),
+                        TextFont {
+                            font_size: 7.0,
+                            ..default()
+                        },
+                        Transform::from_xyz(0.0, 0.0, 10.0),
+                    )],
                 ))
                 .id();
-                Some((coord, entity))
-            } else {
-                None
-            }
+            Some((coord, entity))
         })
         .collect();
 
-    commands.insert_resource(ScenarioMapMaterials {
-        base_material,
-    });
+    commands.insert_resource(ScenarioMapMaterials { base_material });
     commands.insert_resource(overlay_materials);
     commands.insert_resource(ScenarioMap {
         layout,
         base,
         walls: HashSet::new(),
-        overlay_tiles: obstacles,
+        overlay_tiles: HashMap::new(),
         figures: HashMap::new(),
     });
 }

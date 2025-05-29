@@ -41,7 +41,7 @@ struct HexGrid {
 
 /// 2D camera setup
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((Camera2d, Transform::from_scale(Vec3::new(0.5, 0.5, 1.0))));
 }
 
 fn setup_grid(
@@ -63,8 +63,7 @@ fn setup_grid(
         .enumerate()
         .map(|(i, coord)| {
             let pos = layout.hex_to_world_pos(coord);
-            let material = 
-            if i != 0 && i % 5 == 0 {
+            let material = if i != 0 && i % 5 == 0 {
                 blocked_coords.insert(coord);
                 blocked_mat.clone()
             } else {
