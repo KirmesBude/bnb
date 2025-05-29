@@ -29,11 +29,9 @@ impl OverlayTileMaterials {
 
 #[derive(Debug, Resource)]
 pub struct ScenarioMap {
-    pub layout: HexLayout,          /* Layout so we can operate on the HexGrid */
-    pub base: HashMap<Hex, Entity>, /* Basically ground entities */
-    pub walls: HashSet<(Hex, Hex)>, /* Walls are the contact lines between 2 Hexes */
-    pub overlay_tiles: HashMap<Hex, Entity>, /* Any overlays, such as obstacles */
-    pub figures: HashMap<Hex, Entity>, /* Any figures */
+    pub layout: HexLayout,           /* Layout so we can operate on the HexGrid */
+    pub base: HashMap<Hex, Entity>,  /* Basically ground entities */
+    pub runes: HashMap<Hex, Entity>, /* runes */
 }
 
 #[derive(Debug, Resource)]
@@ -45,6 +43,21 @@ pub struct ScenarioMapMaterials {
 
 const HEX_SIZE: Vec2 = Vec2::splat(14.0);
 const MAP_RADIUS: u32 = 20;
+const REMOVE_COORDS: [Hex; 3] = [Hex::new(5, 5), Hex::new(6, 3), Hex::new(7, 1)];
+const RUNE_LOCATIONS: [Hex; 12] = [
+    Hex::new(0, 6),
+    Hex::new(2, 6),
+    Hex::new(-1, 5),
+    Hex::new(-2, 4),
+    Hex::new(4, 4),
+    Hex::new(1, 3),
+    Hex::new(3, 3),
+    Hex::new(0, 2),
+    Hex::new(6, 2),
+    Hex::new(5, 1),
+    Hex::new(2, 0),
+    Hex::new(4, 0),
+];
 
 pub fn setup_map(
     mut commands: Commands,
@@ -66,11 +79,12 @@ pub fn setup_map(
         top: 0,
         bottom: 6,
     };
+
     let base = shape
         .coords()
         .enumerate()
         .filter_map(|(i, coord)| {
-            if coord == Hex::new(5, 5) || coord == Hex::new(6, 3) || coord == Hex::new(7, 1) {
+            if REMOVE_COORDS.contains(&coord) {
                 return None;
             }
             let pos = layout.hex_to_world_pos(coord);
@@ -95,14 +109,32 @@ pub fn setup_map(
         })
         .collect();
 
+    let runes = RUNE_LOCATIONS
+        .into_iter()
+        .map(|coord| {
+            let pos = layout.hex_to_world_pos(coord);
+            let material = overlay_materials
+                .materials
+                .get(&OverlayTile::Obstacle)
+                .unwrap()
+                .clone();
+            let entity = commands
+                .spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(material.clone_weak()),
+                    Transform::from_xyz(pos.x, pos.y, 1.0),
+                ))
+                .id();
+            (coord, entity)
+        })
+        .collect();
+
     commands.insert_resource(ScenarioMapMaterials { base_material });
     commands.insert_resource(overlay_materials);
     commands.insert_resource(ScenarioMap {
         layout,
         base,
-        walls: HashSet::new(),
-        overlay_tiles: HashMap::new(),
-        figures: HashMap::new(),
+        runes,
     });
 }
 
