@@ -1,5 +1,5 @@
 use bevy::{asset::RenderAssetUsages, color::palettes::css::{BLACK, WHITE}, platform::collections::{HashMap, HashSet}, prelude::*, render::mesh::{Indices, PrimitiveTopology}};
-use hexx::{Hex, HexLayout, PlaneMeshBuilder};
+use hexx::{shapes::PointyRectangle, Hex, HexLayout, PlaneMeshBuilder};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum OverlayTile {
@@ -49,15 +49,20 @@ pub fn setup_map(
 ) {
     let layout = HexLayout {
         scale: HEX_SIZE,
+        orientation: hexx::HexOrientation::Pointy,
         ..default()
     };
     let mesh = meshes.add(hexagonal_plane(&layout));
 
     let base_material = materials.add(Color::Srgba(WHITE));
     let overlay_materials = OverlayTileMaterials::new(&mut materials);
-
-    let base = Hex::ZERO
-    .spiral_range(0..=MAP_RADIUS)
+    let shape = PointyRectangle {
+        left: -4,
+        right: 3,
+        top: -3,
+        bottom: 3,
+    };
+    let base = shape.coords()
     .enumerate()
     .map(|(i, coord)| {
         let pos = layout.hex_to_world_pos(coord);
@@ -73,8 +78,7 @@ pub fn setup_map(
     })
     .collect();
 
-    let obstacles = Hex::ZERO
-        .spiral_range(0..=MAP_RADIUS)
+    let obstacles = shape.coords()
         .enumerate()
         .filter_map(|(i, coord)| {
             let pos = layout.hex_to_world_pos(coord);
