@@ -1,9 +1,10 @@
 use bevy::{
     asset::RenderAssetUsages,
-    color::palettes::css::{BLACK, WHITE},
+    color::palettes::css::{BLACK, BLUE, CHOCOLATE, RED, WHITE},
     platform::collections::{HashMap, HashSet},
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
+    window::PrimaryWindow,
 };
 use hexx::{Hex, HexLayout, PlaneMeshBuilder, shapes::PointyRectangle};
 
@@ -11,6 +12,12 @@ use hexx::{Hex, HexLayout, PlaneMeshBuilder, shapes::PointyRectangle};
 pub enum OverlayTile {
     Obstacle,
 }
+
+#[derive(Debug, Component, Default)]
+pub struct Rune(usize);
+
+#[derive(Debug, Component, Default)]
+pub struct AffectedByRune(usize);
 
 #[derive(Debug, Resource)]
 pub struct OverlayTileMaterials {
@@ -37,6 +44,8 @@ pub struct ScenarioMap {
 #[derive(Debug, Resource)]
 pub struct ScenarioMapMaterials {
     pub base_material: Handle<ColorMaterial>,
+    pub range_material: Handle<ColorMaterial>,
+    pub pick_material: Handle<ColorMaterial>,
 }
 
 /* Path highlighting via material change on ground entity */
@@ -72,6 +81,9 @@ pub fn setup_map(
     let mesh = meshes.add(hexagonal_plane(&layout));
 
     let base_material = materials.add(Color::Srgba(WHITE));
+    let range_material = materials.add(Color::Srgba(BLUE));
+    let pick_material = materials.add(Color::Srgba(RED));
+
     let overlay_materials = OverlayTileMaterials::new(&mut materials);
     let shape = PointyRectangle {
         left: 0,
@@ -94,6 +106,7 @@ pub fn setup_map(
                     Mesh2d(mesh.clone()),
                     MeshMaterial2d(material.clone_weak()),
                     Transform::from_xyz(pos.x, pos.y, 0.0),
+                    AffectedByRune(0),
                     children![(
                         Text2d(format!("{},{}", coord.x, coord.y)),
                         TextColor(Color::BLACK),
@@ -123,13 +136,27 @@ pub fn setup_map(
                     Mesh2d(mesh.clone()),
                     MeshMaterial2d(material.clone_weak()),
                     Transform::from_xyz(pos.x, pos.y, 1.0),
+                    Rune(0),
+                    children![(
+                        Text2d(format!("{}", 0)),
+                        TextColor(Color::WHITE),
+                        TextFont {
+                            font_size: 7.0,
+                            ..default()
+                        },
+                        Transform::from_xyz(0.0, 0.0, 10.0),
+                    )],
                 ))
                 .id();
             (coord, entity)
         })
         .collect();
 
-    commands.insert_resource(ScenarioMapMaterials { base_material });
+    commands.insert_resource(ScenarioMapMaterials {
+        base_material,
+        range_material,
+        pick_material,
+    });
     commands.insert_resource(overlay_materials);
     commands.insert_resource(ScenarioMap {
         layout,
@@ -153,4 +180,49 @@ fn hexagonal_plane(hex_layout: &HexLayout) -> Mesh {
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, mesh_info.normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, mesh_info.uvs)
     .with_inserted_indices(Indices::U16(mesh_info.indices))
+}
+
+pub fn handle_input(
+    buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    cameras: Query<(&Camera, &GlobalTransform)>,
+    map: ResMut<ScenarioMap>,
+    mut runes: Query<&mut Rune>,
+) -> Result {
+    let window = windows.single()?;
+    let (camera, cam_transform) = cameras.single()?;
+    if let Some(pos) = window
+        .cursor_position()
+        .and_then(|p| camera.viewport_to_world_2d(cam_transform, p).ok())
+    {
+        let hex_pos = map.layout.world_pos_to_hex(pos);
+        let Some(entity) = map.runes.get(&hex_pos).copied() else {
+            return Ok(());
+        };
+        let Ok(mut rune) = runes.get_mut(entity) else {
+            return Ok(());
+        };
+        if buttons.just_pressed(MouseButton::Left) {
+            rune.0 = (rune.0 + 1) % 13;
+        } else if buttons.just_pressed(MouseButton::Right) {
+            rune.0 = rune.0.saturating_sub(1);
+        }
+    }
+    Ok(())
+}
+
+pub fn update_counter(
+    mut text2d_q: Query<&mut Text2d>,
+    runes: Query<(&Rune, &Children), Changed<Rune>>,
+) -> Result {
+    for (rune, children) in runes {
+        let counter = rune.0;
+
+        for entity in children {
+            if let Ok(mut text2d) = text2d_q.get_mut(*entity) {
+                text2d.0 = format!("{}", counter);
+            }
+        }
+    }
+    Ok(())
 }
