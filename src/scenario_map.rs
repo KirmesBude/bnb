@@ -226,3 +226,75 @@ pub fn update_counter(
     }
     Ok(())
 }
+
+pub fn reset_counter2(affected_by_rune: Query<&mut AffectedByRune>) {
+    for mut thing in affected_by_rune {
+        thing.0 = 0;
+    }
+}
+
+pub fn update_counter2(
+    rune_q: Query<&Rune>,
+    mut affected_by_rune_q: Query<&mut AffectedByRune>,
+    map: Res<ScenarioMap>,
+) -> Result {
+    for (hex, entity) in &map.runes {
+        let Ok(rune) = rune_q.get(*entity) else {
+            return Ok(());
+        };
+
+        let range = (rune.0 + 1) / 2;
+        for hex in hex.ring(range as u32) {
+            if let Some(entity) = map.base.get(&hex) {
+                if let Ok(mut affected_by_rune) = affected_by_rune_q.get_mut(*entity) {
+                    affected_by_rune.0 += 1;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn reset_material(
+    scenario_map_materials: Res<ScenarioMapMaterials>,
+    mut material_q: Query<&mut MeshMaterial2d<ColorMaterial>>,
+    map: Res<ScenarioMap>,
+) {
+    let base_material = scenario_map_materials.base_material.clone();
+    for entity in map.base.values() {
+        if let Ok(mut material) = material_q.get_mut(*entity) {
+            material.0 = base_material.clone();
+        }
+    }
+}
+
+pub fn update_range_display(
+    scenario_map_materials: Res<ScenarioMapMaterials>,
+    mut material_q: Query<(&mut MeshMaterial2d<ColorMaterial>, &AffectedByRune)>,
+    map: Res<ScenarioMap>,
+) {
+    let range_material = scenario_map_materials.range_material.clone();
+    for entity in map.base.values() {
+        if let Ok((mut material, affected_by_rune)) = material_q.get_mut(*entity) {
+            if affected_by_rune.0 > 0 {
+                material.0 = range_material.clone();
+            }
+        }
+    }
+}
+
+pub fn update_pick_display(
+    scenario_map_materials: Res<ScenarioMapMaterials>,
+    mut material_q: Query<(&mut MeshMaterial2d<ColorMaterial>, &AffectedByRune)>,
+    map: Res<ScenarioMap>,
+) {
+    let pick_material = scenario_map_materials.pick_material.clone();
+    for entity in map.base.values() {
+        if let Ok((mut material, affected_by_rune)) = material_q.get_mut(*entity) {
+            if affected_by_rune.0 >= 3 {
+                material.0 = pick_material.clone();
+            }
+        }
+    }
+}

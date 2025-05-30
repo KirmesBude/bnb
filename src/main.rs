@@ -6,7 +6,10 @@ use bevy::{
     window::PrimaryWindow,
 };
 use hexx::{algorithms::a_star, *};
-use scenario_map::{handle_input, setup_map, update_counter};
+use scenario_map::{
+    handle_input, reset_counter2, reset_material, setup_map, update_counter, update_counter2,
+    update_pick_display, update_range_display,
+};
 
 pub mod scenario_map;
 
@@ -24,7 +27,19 @@ pub fn main() {
             ..default()
         }))
         .add_systems(Startup, (setup_camera, setup_map))
-        .add_systems(Update, (handle_input, update_counter))
+        .add_systems(
+            Update,
+            (
+                handle_input,
+                update_counter,
+                reset_counter2,
+                update_counter2,
+                reset_material,
+                update_range_display,
+                update_pick_display,
+            )
+                .chain(),
+        )
         .run();
 }
 
